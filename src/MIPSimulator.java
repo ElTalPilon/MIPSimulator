@@ -7,7 +7,7 @@ import java.util.concurrent.CyclicBarrier;
  * Clase que simula un procesador de 1 núcleo MIPS
  *
  */
-public class MIPSimulator {
+public class MIPSimulator implements Runnable{
 	private int[] instructionMem; // Memoria de instrucciones
 	private int[] dataMem;        // Memoria de datos
 	private int[] R;              // Registros del procesador
@@ -36,7 +36,7 @@ public class MIPSimulator {
 	 * Ejecuta el programa especificado.
 	 * @param program - Archivo .txt con lenguaje máquina (para MIPS) en decimal. 
 	 */
-	public void run(File program){
+	public void loadFile(File program){
 		try{
 			// Guarda las instrucciones del archivo en la memoria
 			Scanner scanner = new Scanner(program);
@@ -53,14 +53,6 @@ public class MIPSimulator {
 		}
 		// Imprime el programa que se va a ejecutar
 		printProgram();
-		
-		//El programa se ejecuta hasta toparse con una instruccion "FIN"
-		while(clockCycle == 0){//instructionMem[PC] != 63){
-			System.out.println("Ciclo: " + clockCycle);
-			PC = executeInstruction(instructionMem[PC], instructionMem[PC+1], instructionMem[PC+2], instructionMem[PC+3]);
-			clockCycle++;
-		}
-		printState();
 	}
 	
 	public int executeInstruction(int instruction, int X, int Y, int Z){
@@ -155,5 +147,17 @@ public class MIPSimulator {
 			}
 			System.out.println();
 		}
+	}
+
+	@Override
+	public void run() {
+		
+		//El programa se ejecuta hasta toparse con una instruccion "FIN"
+		while(clockCycle == 0){//instructionMem[PC] != 63){
+			System.out.println("Ciclo: " + clockCycle);
+			PC = executeInstruction(instructionMem[PC], instructionMem[PC+1], instructionMem[PC+2], instructionMem[PC+3]);
+			clockCycle++;
+		}
+		printState();
 	}
 }
