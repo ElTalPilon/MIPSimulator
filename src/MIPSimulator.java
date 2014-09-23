@@ -10,26 +10,38 @@ import java.util.concurrent.CyclicBarrier;
 public class MIPSimulator implements Runnable{
 	private int[] instructionMem; // Memoria de instrucciones
 	private int[] dataMem;        // Memoria de datos
-	private int[] R;              // Registros del procesador
+	private Register[] R;		  // Registros del procesador
 	private CyclicBarrier clock;  // Reloj del sistema
 	private int clockCycle;       // Ciclo actual de reloj
 	private int PC;               // Contador del programa / Puntero de instrucciones
+	
+	private Register IF_ID;
+	private Register IF_EX;
+	private Register IF_MEM;
+	private Register IF_WB;
 	
 	/**
 	 * Construye una instancia de MIPSimulator e inicializa sus atributos.
 	 */
 	public MIPSimulator(){
-		this.R = new int[32];
-		this.PC = 0;
-		this.clock = new CyclicBarrier(4); // El 4 no sé...
-		this.dataMem = new int[200];
-		this.clockCycle = 0;
-		this.instructionMem = new int[400];
+		PC = 0;
+		IF_ID = new Register();
+		IF_EX = new Register();
+		IF_MEM = new Register();
+		IF_WB = new Register();
+		clock = new CyclicBarrier(4); // El 4 no sé...
+		dataMem = new int[200];
+		clockCycle = 0;
+		instructionMem = new int[400];
 		for(int i = 0; i < instructionMem.length; i++){
 			instructionMem[i] = -1;
 			dataMem[i%200] = -1;
-			R[i%32] = -1;
+			if(i < 32){
+				R[i] = new Register();
+			}
 		}
+		R[0].lock.lock();
+		R[4].set(4);
 	}
 	
 	/**
