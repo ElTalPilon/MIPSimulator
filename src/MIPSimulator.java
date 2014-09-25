@@ -7,7 +7,7 @@ import java.util.concurrent.CyclicBarrier;
  * Clase que simula un procesador de 1 núcleo MIPS
  *
  */
-public class MIPSimulator implements Runnable{
+public class MIPSimulator {
 	private int[] instructionMem; // Memoria de instrucciones
 	private int[] dataMem;        // Memoria de datos
 	private Register[] R;		  // Registros del procesador
@@ -161,8 +161,7 @@ public class MIPSimulator implements Runnable{
 		}
 	}
 
-	@Override
-	public void run() {
+	public void runProgram() {
 		
 		//El programa se ejecuta hasta toparse con una instruccion "FIN"
 		while(clockCycle == 0){//instructionMem[PC] != 63){
