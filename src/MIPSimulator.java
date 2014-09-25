@@ -5,7 +5,6 @@ import java.util.concurrent.CyclicBarrier;
 
 /**
  * Clase que simula un procesador de 1 núcleo MIPS
- *
  */
 public class MIPSimulator {
 	private int[] instructionMem; // Memoria de instrucciones
@@ -15,19 +14,59 @@ public class MIPSimulator {
 	private int clockCycle;       // Ciclo actual de reloj
 	private int PC;               // Contador del programa / Puntero de instrucciones
 	
+	private int[] IR;
 	private Register IF_ID;
 	private Register IF_EX;
 	private Register IF_MEM;
 	private Register IF_WB;
 	
+	private final int DADDI = 8;
+	private final int DADD = 32;
+	private final int DSUB = 34;
+	private final int DMUL = 12;
+	private final int DDIV = 14;
+	private final int LW = 35;
+	private final int SW = 43;
+	private final int BEQZ = 4;
+	private final int BNEZ = 5;
+	private final int LL = 0;
+	private final int SC = 1;
+	private final int JAL = 3;
+	private final int JR = 2;
+	private final int FIN = 63;
+	
+	/**
+	 * Instancia de runnable que se encargará de la etapa IF del pipeline.
+	 * En esta etapa se guarda en IR la instrucción a la que apunta PC y,
+	 * si ID no está ocupado, se le pasa IR.
+	 */
 	private final Runnable IFstage = new Runnable(){
 		@Override
-		public void run(){}
+		public void run(){
+			while(instructionMem[PC] == FIN){
+				// Guarda la instrucción a ejecutar en IR
+				for(int i = 0; i < 4; i++){
+					IR[i] = instructionMem[PC+i];
+				}
+				
+				// Espera a que ID se desocupe con un lock o algo
+			}
+		}
 	};
 	
+	/**
+	 * Instancia de runnable que se encargara de la etapa ID del pipeline.
+	 * En esta etapa se decodifica la instrucción, se obtienen la información
+	 * necesaria, ya sea en registros o en memoria de datos.
+	 */
 	private final Runnable IDstage = new Runnable(){
 		@Override
-		public void run(){}
+		public void run(){
+			switch(IR[0]){
+				case DADDI:
+				break;
+			}
+		}
 	};
 	
 	private final Runnable EXstage = new Runnable(){
@@ -50,6 +89,7 @@ public class MIPSimulator {
 	 */
 	public MIPSimulator(){
 		PC = 0;
+		IR = new int[4];
 		IF_ID = new Register();
 		IF_EX = new Register();
 		IF_MEM = new Register();
