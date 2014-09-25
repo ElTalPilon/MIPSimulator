@@ -163,6 +163,8 @@ public class MIPSimulator {
 
 	public void runProgram() {
 		
+		Stage IDstage = new Stage(Stage.ID);
+		
 		//El programa se ejecuta hasta toparse con una instruccion "FIN"
 		while(clockCycle == 0){//instructionMem[PC] != 63){
 			System.out.println("Ciclo: " + clockCycle);
