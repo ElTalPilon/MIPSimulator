@@ -20,6 +20,31 @@ public class MIPSimulator {
 	private Register IF_MEM;
 	private Register IF_WB;
 	
+	private final Runnable IFstage = new Runnable(){
+		@Override
+		public void run(){}
+	};
+	
+	private final Runnable IDstage = new Runnable(){
+		@Override
+		public void run(){}
+	};
+	
+	private final Runnable EXstage = new Runnable(){
+		@Override
+		public void run(){}
+	};
+	
+	private final Runnable Mstage = new Runnable(){
+		@Override
+		public void run(){}
+	};
+	
+	private final Runnable WBstage = new Runnable(){
+		@Override
+		public void run(){}
+	};
+	
 	/**
 	 * Construye una instancia de MIPSimulator e inicializa sus atributos.
 	 */
@@ -162,8 +187,6 @@ public class MIPSimulator {
 	}
 
 	public void runProgram() {
-		
-		Stage IDstage = new Stage(Stage.ID);
 		
 		//El programa se ejecuta hasta toparse con una instruccion "FIN"
 		while(clockCycle == 0){//instructionMem[PC] != 63){
