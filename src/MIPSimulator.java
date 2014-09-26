@@ -183,7 +183,11 @@ public class MIPSimulator {
 		ID_EX = new int[3];
 		EX_MEM = new int[2];
 <<<<<<< HEAD
+<<<<<<< HEAD
 		MEM_WB = new int[1]; //por
+=======
+		MEM_WB = new int[2];
+>>>>>>> b61441f4e898a596ce9207902bf4561debb8a741
 =======
 		MEM_WB = new int[2];
 >>>>>>> b61441f4e898a596ce9207902bf4561debb8a741
