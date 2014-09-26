@@ -184,9 +184,11 @@ public class MIPSimulator {
 			switch(IR[0]){
 				case LW:
 					MEM_WB[0] = instructionMem[EX_MEM[1]]; 
+					MEM_WB[1] = EX_MEM[0];
 				break;
 				case SW:
 					instructionMem[EX_MEM[1]] = MEM_WB[0];
+					MEM_WB[1] = EX_MEM[0];
 				break;
 			}
 			
