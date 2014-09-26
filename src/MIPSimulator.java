@@ -46,7 +46,10 @@ public class MIPSimulator {
 				// Guarda la instrucción a ejecutar en IR
 				for(int i = 0; i < 4; i++){
 					IR[i] = instructionMem[PC+i];
+					IF_ID[i] = IR[i];
 				}
+				
+				
 				
 				// Espera a que ID se desocupe con un lock o algo así
 				
@@ -64,7 +67,6 @@ public class MIPSimulator {
 	private final Runnable IDstage = new Runnable(){
 		@Override
 		public void run(){
-			Lock IDlock = new ReentrantLock();
 			while(IR[0] != FIN){
 				switch(IR[0]){
 					case DADDI:
@@ -118,9 +120,36 @@ public class MIPSimulator {
 		}
 	};
 	
+	/** 
+	 * En esta etapa se escribe en EX_M
+	 * debe verificar que EX_M no este bloqueado
+	 */
 	private final Runnable EXstage = new Runnable(){
 		@Override
-		public void run(){}
+		public void run(){
+			switch(IR[0]){
+				case DADDI:
+					EX_M[0] = ID_EX[0]+ID_EX[2];
+					EX_M[1] = -1; //como escribe en registro, el campo de memoria va vacio
+				break;
+				case DADD:
+					EX_M[0] = ID_EX[0] + ID_EX[2];
+					EX_M[1] = -1;
+				break;
+				case DSUB:
+					EX_M[0] = ID_EX[0] - ID_EX[2];
+					EX_M[1] = -1;
+				break;
+				case DMUL:
+					EX_M[0] = ID_EX[0] * ID_EX[2];
+					EX_M[1] = -1;
+				break;
+				case DDIV:
+					EX_M[0] = ID_EX[0] / ID_EX[2];
+					EX_M[1] = -1;
+				break;
+			}		
+		}
 	};
 	
 	private final Runnable Mstage = new Runnable(){
@@ -139,7 +168,7 @@ public class MIPSimulator {
 	public MIPSimulator(){
 		PC = 0;
 		IR = new int[4];
-		IF_ID = new int[3];
+		IF_ID = new int[4];
 		ID_EX = new int[3];
 		EX_M = new int[2];
 		M_WB = new int[1];
