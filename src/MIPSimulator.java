@@ -6,6 +6,7 @@ import java.util.concurrent.CyclicBarrier;
 /**
  * Clase que simula un procesador de 1 núcleo MIPS
  */
+//esto es basura
 public class MIPSimulator {
 	private int[] instructionMem; // Memoria de instrucciones
 	private int[] dataMem;        // Memoria de datos
