@@ -34,6 +34,32 @@ public class MIPSimulator {
 	private final int FIN = 63;
 	
 	/**
+	 * Construye una instancia de MIPSimulator e inicializa sus atributos.
+	 */
+	public MIPSimulator(){
+		PC = 0;
+		IR = new int[4];
+		IF_ID = new int[4];
+		ID_EX = new int[3];
+		EX_MEM = new int[2];
+		runningID = true;
+		clock = new CyclicBarrier(4); // El 4 no sé...
+		dataMem = new int[200];
+		clockCycle = 0;
+		instructionMem = new int[400];
+		R = new Register[32];
+		for(int i = 0; i < instructionMem.length; i++){
+			instructionMem[i] = -1;
+			dataMem[i%200] = -1;
+			if(i < 32){
+				R[i] = new Register();
+			}
+		}
+		R[0].lock.lock();
+		R[4].set(4);
+	}
+	
+	/**
 	 * Instancia de runnable que se encargará de la etapa IF del pipeline.
 	 * En esta etapa se guarda en IR la instrucción a la que apunta PC y,
 	 * si ID no está ocupado, se le pasa IR.
@@ -172,32 +198,6 @@ public class MIPSimulator {
 			R[MEM_WB[0]].set(MEM_WB[1]);
 		}
 	};
-	
-	/**
-	 * Construye una instancia de MIPSimulator e inicializa sus atributos.
-	 */
-	public MIPSimulator(){
-		PC = 0;
-		IR = new int[4];
-		IF_ID = new int[4];
-		ID_EX = new int[3];
-		EX_MEM = new int[2];
-		runningID = true;
-		clock = new CyclicBarrier(4); // El 4 no sé...
-		dataMem = new int[200];
-		clockCycle = 0;
-		instructionMem = new int[400];
-		R = new Register[32];
-		for(int i = 0; i < instructionMem.length; i++){
-			instructionMem[i] = -1;
-			dataMem[i%200] = -1;
-			if(i < 32){
-				R[i] = new Register();
-			}
-		}
-		R[0].lock.lock();
-		R[4].set(4);
-	}
 	
 	/**
 	 * Ejecuta el programa especificado.
