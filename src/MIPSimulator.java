@@ -4,7 +4,7 @@ import java.util.Scanner;
 import java.util.concurrent.CyclicBarrier;
 
 /**
- * Clase que simula un procesador de 1 núcleo MIPS
+ * Clase que simula un procesador de 1 núcleo MIPS  
  */
 public class MIPSimulator {
 	private int[] instructionMem; // Memoria de instrucciones
