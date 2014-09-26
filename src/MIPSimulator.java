@@ -176,7 +176,7 @@ public class MIPSimulator {
 	private final Runnable WBstage = new Runnable(){
 		@Override
 		public void run(){
-			
+			R[MEM_WB[0]].set(MEM_WB[1]);
 		}
 	};
 	
@@ -189,7 +189,7 @@ public class MIPSimulator {
 		IF_ID = new int[4];
 		ID_EX = new int[3];
 		EX_MEM = new int[2];
-		MEM_WB = new int[1];
+		MEM_WB = new int[2];
 		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
