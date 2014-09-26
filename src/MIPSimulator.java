@@ -6,7 +6,6 @@ import java.util.concurrent.CyclicBarrier;
 /**
  * Clase que simula un procesador de 1 núcleo MIPS
  */
-//esto es basura
 public class MIPSimulator {
 	private int[] instructionMem; // Memoria de instrucciones
 	private int[] dataMem;        // Memoria de datos
@@ -17,10 +16,10 @@ public class MIPSimulator {
 	private boolean runningID;
 	
 	private int[] IR;
-	private Register IF_ID;
-	private Register IF_EX;
-	private Register IF_MEM;
-	private Register IF_WB;
+	private int[] IF_ID;
+	private int[] ID_EX;
+	private int[] EX_M;
+	private int[] M_WB;
 	
 	private final int DADDI = 8;
 	private final int DADD = 32;
@@ -29,10 +28,6 @@ public class MIPSimulator {
 	private final int DDIV = 14;
 	private final int LW = 35;
 	private final int SW = 43;
-	private final int BEQZ = 4;
-	private final int BNEZ = 5;
-	private final int LL = 0;
-	private final int SC = 1;
 	private final int JAL = 3;
 	private final int JR = 2;
 	private final int FIN = 63;
@@ -70,31 +65,33 @@ public class MIPSimulator {
 			while(IR[0] != FIN){
 				switch(IR[0]){
 					case DADDI:
-						IR[1] = R[IR[1]].get();
+						IR[1] = R[IR[1]].get(); // Y
+						IR[2] = R[IR[2]].get(); // X
+						                 // IR[3]  n
 					break;
 					case DADD:
+						IR[1] = R[IR[1]].get(); // Y
+						                  // IR[2] Z
+						IR[3] = R[IR[3]].get(); // X
 					break;
 					case DSUB:
+						IR[1] = R[IR[1]].get();
+						// En IR[2] se mantiene el # de registro que se necesita
+						IR[3] = R[IR[3]].get();
 					break;
 					case DMUL:
+						IR[1] = R[IR[1]].get();
+						// En IR[2] se mantiene el # de registro que se necesita
+						IR[3] = R[IR[3]].get();
 					break;
 					case DDIV:
+						IR[1] = R[IR[1]].get();
+						// En IR[2] se mantiene el # de registro que se necesita
+						IR[3] = R[IR[3]].get();
 					break;
 					case LW:
 					break;
 					case SW:
-					break;
-					case BEQZ:
-						// Caso no manejado aún
-					break;
-					case BNEZ:
-						// Caso no manejado aún
-					break;
-					case LL:
-						// Caso no manejado aún
-					break;
-					case SC:
-						// Caso no manejado aún
 					break;
 					case JAL:
 					break;
@@ -102,6 +99,7 @@ public class MIPSimulator {
 					break;
 				}
 			}
+			
 		}
 	};
 	
@@ -126,10 +124,10 @@ public class MIPSimulator {
 	public MIPSimulator(){
 		PC = 0;
 		IR = new int[4];
-		IF_ID = new Register();
-		IF_EX = new Register();
-		IF_MEM = new Register();
-		IF_WB = new Register();
+		IF_ID = new int[3];
+		ID_EX = new int[3];
+		EX_M = new int[2];
+		M_WB = new int[1];
 		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
