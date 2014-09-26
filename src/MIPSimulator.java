@@ -187,6 +187,8 @@ public class MIPSimulator {
 					MEM_WB[1] = EX_MEM[0];
 				break;
 				default:
+					MEM_WB[0] = EX_MEM[1];
+					MEM_WB[1] = EX_MEM[0];
 					
 			}
 			
