@@ -69,6 +69,7 @@ public class MIPSimulator {
 			while(IR[0] != FIN){
 				switch(IR[0]){
 					case DADDI:
+						IR[1] = R[IR[1]].get();
 					break;
 					case DADD:
 					break;
