@@ -179,13 +179,15 @@ public class MIPSimulator {
 		public void run(){
 			switch(IR[0]){
 				case LW:
-					MEM_WB[0] = instructionMem[EX_MEM[1]]; 
+					MEM_WB[0] = dataMem[EX_MEM[0]]; 
 					MEM_WB[1] = EX_MEM[0];
 				break;
 				case SW:
-					instructionMem[EX_MEM[1]] = MEM_WB[0];
+					dataMem[EX_MEM[0]] = EX_MEM[1];
 					MEM_WB[1] = EX_MEM[0];
 				break;
+				default:
+					
 			}
 			
 		}
@@ -196,26 +198,23 @@ public class MIPSimulator {
 		public void run(){
 			switch(IR[0]){
 				case DADDI:
-					storeInReg();
+					R[MEM_WB[0]].set(MEM_WB[1]);
 				break;
 				case DADD:
-					storeInReg();
+					R[MEM_WB[0]].set(MEM_WB[1]);
 				break;
 				case DSUB:
-					storeInReg();
+					R[MEM_WB[0]].set(MEM_WB[1]);
 				break;
 				case DMUL:
-					storeInReg();
+					R[MEM_WB[0]].set(MEM_WB[1]);
 				break;
 				case DDIV:
-					storeInReg();
+					R[MEM_WB[0]].set(MEM_WB[1]);
 				break;
 			}
 		}
 		
-		private void storeInReg(){
-			R[MEM_WB[0]].set(MEM_WB[1]);
-		}
 	};
 	
 	/**
