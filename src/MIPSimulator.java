@@ -42,6 +42,7 @@ public class MIPSimulator {
 		IF_ID = new int[4];
 		ID_EX = new int[3];
 		EX_MEM = new int[2];
+		MEM_WB = new int[2];
 		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
