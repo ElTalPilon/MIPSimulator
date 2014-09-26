@@ -56,8 +56,6 @@ public class MIPSimulator {
 				R[i] = new Register();
 			}
 		}
-		R[0].lock.lock();
-		R[4].set(4);
 	}
 	
 	/**
@@ -74,8 +72,6 @@ public class MIPSimulator {
 					IR[i] = instructionMem[PC+i];
 					IF_ID[i] = IR[i];
 				}
-				
-				
 				
 				// Espera a que ID se desocupe con un lock o algo así
 				
@@ -146,31 +142,31 @@ public class MIPSimulator {
 			switch(IR[0]){
 				case DADDI:
 					EX_MEM[0] = ID_EX[0]+ID_EX[2];
-					EX_MEM[1] = -1; //como escribe en registro, el campo de memoria va vacio
+					EX_MEM[1] = ID_EX[1]; //como escribe en registro, el campo de memoria va vacio
 				break;
 				case DADD:
 					EX_MEM[0] = ID_EX[0] + ID_EX[2];
-					EX_MEM[1] = -1;
+					EX_MEM[1] = ID_EX[1];
 				break;
 				case DSUB:
 					EX_MEM[0] = ID_EX[0] - ID_EX[2];
-					EX_MEM[1] = -1;
+					EX_MEM[1] = ID_EX[1];
 				break;
 				case DMUL:
 					EX_MEM[0] = ID_EX[0] * ID_EX[2];
-					EX_MEM[1] = -1;
+					EX_MEM[1] = ID_EX[1];
 				break;
 				case DDIV:
 					EX_MEM[0] = ID_EX[0] / ID_EX[2];
-					EX_MEM[1] = -1;
+					EX_MEM[1] = ID_EX[1];
 				break;
 				case LW:
-					EX_MEM[0] = instructionMem[ID_EX[0]+ID_EX[2]];
+					EX_MEM[0] = ID_EX[0]+ID_EX[2];
 					EX_MEM[1] = ID_EX[1];
 				break;
 				case SW:
-					EX_MEM[0] = ID_EX[1];
-					EX_MEM[1] = instructionMem[ID_EX[0]+ID_EX[2]];
+					EX_MEM[0] = ID_EX[0]+ID_EX[2];
+					EX_MEM[1] = ID_EX[1];
 				break;
 			}		
 		}
