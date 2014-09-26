@@ -31,8 +31,6 @@ public class MIPSimulator {
 	private final int DDIV = 14;
 	private final int LW = 35;
 	private final int SW = 43;
-	private final int JAL = 3;
-	private final int JR = 2;
 	private final int FIN = 63;
 	
 	/**
@@ -105,16 +103,6 @@ public class MIPSimulator {
 						ID_EX[1] = R[IR[2]].get(); // RX
 						ID_EX[2] = IR[3];          // n
 					break;
-					case JAL:
-						ID_EX[0] = IR[3]; // n
-						ID_EX[1] = IR[3]; // n
-						ID_EX[2] = IR[3]; // n
-					break;
-					case JR:
-						ID_EX[0] = R[IR[2]].get(); // RX
-						ID_EX[1] = 0;              // 0
-						ID_EX[2] = 0;              // 0
-					break;
 				}
 			}
 			
@@ -160,7 +148,9 @@ public class MIPSimulator {
 	
 	private final Runnable WBstage = new Runnable(){
 		@Override
-		public void run(){}
+		public void run(){
+			
+		}
 	};
 	
 	/**
