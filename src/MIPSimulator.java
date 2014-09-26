@@ -20,8 +20,8 @@ public class MIPSimulator {
 	private int[] IR;
 	private int[] IF_ID;
 	private int[] ID_EX;
-	private int[] EX_M;
-	private int[] M_WB;
+	private int[] EX_MEM;
+	private int[] MEM_WB;
 	
 	private final int DADDI = 8;
 	private final int DADD = 32;
@@ -129,24 +129,24 @@ public class MIPSimulator {
 		public void run(){
 			switch(IR[0]){
 				case DADDI:
-					EX_M[0] = ID_EX[0]+ID_EX[2];
-					EX_M[1] = -1; //como escribe en registro, el campo de memoria va vacio
+					EX_MEM[0] = ID_EX[0]+ID_EX[2];
+					EX_MEM[1] = -1; //como escribe en registro, el campo de memoria va vacio
 				break;
 				case DADD:
-					EX_M[0] = ID_EX[0] + ID_EX[2];
-					EX_M[1] = -1;
+					EX_MEM[0] = ID_EX[0] + ID_EX[2];
+					EX_MEM[1] = -1;
 				break;
 				case DSUB:
-					EX_M[0] = ID_EX[0] - ID_EX[2];
-					EX_M[1] = -1;
+					EX_MEM[0] = ID_EX[0] - ID_EX[2];
+					EX_MEM[1] = -1;
 				break;
 				case DMUL:
-					EX_M[0] = ID_EX[0] * ID_EX[2];
-					EX_M[1] = -1;
+					EX_MEM[0] = ID_EX[0] * ID_EX[2];
+					EX_MEM[1] = -1;
 				break;
 				case DDIV:
-					EX_M[0] = ID_EX[0] / ID_EX[2];
-					EX_M[1] = -1;
+					EX_MEM[0] = ID_EX[0] / ID_EX[2];
+					EX_MEM[1] = -1;
 				break;
 			}		
 		}
@@ -170,8 +170,8 @@ public class MIPSimulator {
 		IR = new int[4];
 		IF_ID = new int[4];
 		ID_EX = new int[3];
-		EX_M = new int[2];
-		M_WB = new int[1];
+		EX_MEM = new int[2];
+		MEM_WB = new int[1];
 		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
