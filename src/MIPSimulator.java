@@ -149,18 +149,47 @@ public class MIPSimulator {
 					EX_MEM[0] = ID_EX[0] / ID_EX[2];
 					EX_MEM[1] = -1;
 				break;
+				case LW:
+					EX_MEM[0] = instructionMem[ID_EX[0]+ID_EX[2]];
+					EX_MEM[1] = ID_EX[1];
+				break;
+				case SW:
+					EX_MEM[0] = ID_EX[1];
+					EX_MEM[1] = instructionMem[ID_EX[0]+ID_EX[2]];
+				break;
 			}		
 		}
 	};
 	
-	private final Runnable Mstage = new Runnable(){
+	
+	private final Runnable MEMstage = new Runnable(){
 		@Override
-		public void run(){}
+		public void run(){
+			switch(IR[0]){
+				case DADDI:
+				break;
+				case DADD:
+				break;
+				case DSUB:
+				break;
+				case DMUL:
+				break;
+				case DDIV:
+				break;
+				case LW:
+				break;
+				case SW:
+				break;
+			}
+			
+		}
 	};
 	
 	private final Runnable WBstage = new Runnable(){
 		@Override
-		public void run(){}
+		public void run(){
+			
+		}
 	};
 	
 	/**
@@ -262,7 +291,7 @@ public class MIPSimulator {
 			Thread IF = new Thread(IFstage);
 			Thread ID = new Thread(IDstage);
 			Thread EX = new Thread(EXstage);
-			Thread M  = new Thread(Mstage);
+			Thread M  = new Thread(MEMstage);
 			Thread WB = new Thread(WBstage);
 			
 			IF.run();
