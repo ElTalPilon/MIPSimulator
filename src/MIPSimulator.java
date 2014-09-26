@@ -8,6 +8,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Clase que simula un procesador de 1 núcleo MIPS  
  */
+//
 public class MIPSimulator {
 	private int[] instructionMem; // Memoria de instrucciones
 	private int[] dataMem;        // Memoria de datos
