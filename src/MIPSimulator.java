@@ -169,6 +169,26 @@ public class MIPSimulator {
 	private final Runnable WBstage = new Runnable(){
 		@Override
 		public void run(){
+			switch(IR[0]){
+				case DADDI:
+					storeInReg();
+				break;
+				case DADD:
+					storeInReg();
+				break;
+				case DSUB:
+					storeInReg();
+				break;
+				case DMUL:
+					storeInReg();
+				break;
+				case DDIV:
+					storeInReg();
+				break;
+			}
+		}
+		
+		private void storeInReg(){
 			R[MEM_WB[0]].set(MEM_WB[1]);
 		}
 	};
