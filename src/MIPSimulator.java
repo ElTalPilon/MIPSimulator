@@ -132,7 +132,7 @@ public class MIPSimulator {
 					break;
 				}
 			}
-			
+			runningID = false;	
 		}
 	};
 	
