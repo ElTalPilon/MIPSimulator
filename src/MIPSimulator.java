@@ -13,6 +13,7 @@ public class MIPSimulator {
 	private CyclicBarrier clock;  // Reloj del sistema
 	private int clockCycle;       // Ciclo actual de reloj
 	private int PC;               // Contador del programa / Puntero de instrucciones
+	private boolean runningID;
 	
 	private int[] IR;
 	private Register IF_ID;
@@ -43,13 +44,16 @@ public class MIPSimulator {
 	private final Runnable IFstage = new Runnable(){
 		@Override
 		public void run(){
-			while(instructionMem[PC] == FIN){
+			while(runningID){
 				// Guarda la instrucción a ejecutar en IR
 				for(int i = 0; i < 4; i++){
 					IR[i] = instructionMem[PC+i];
 				}
 				
-				// Espera a que ID se desocupe con un lock o algo
+				// Espera a que ID se desocupe con un lock o algo así
+				
+				// Aumenta el PC
+				PC += 4;
 			}
 		}
 	};
@@ -62,9 +66,39 @@ public class MIPSimulator {
 	private final Runnable IDstage = new Runnable(){
 		@Override
 		public void run(){
-			switch(IR[0]){
-				case DADDI:
-				break;
+			while(IR[0] != FIN){
+				switch(IR[0]){
+					case DADDI:
+					break;
+					case DADD:
+					break;
+					case DSUB:
+					break;
+					case DMUL:
+					break;
+					case DDIV:
+					break;
+					case LW:
+					break;
+					case SW:
+					break;
+					case BEQZ:
+						// Caso no manejado aún
+					break;
+					case BNEZ:
+						// Caso no manejado aún
+					break;
+					case LL:
+						// Caso no manejado aún
+					break;
+					case SC:
+						// Caso no manejado aún
+					break;
+					case JAL:
+					break;
+					case JR:
+					break;
+				}
 			}
 		}
 	};
@@ -94,10 +128,12 @@ public class MIPSimulator {
 		IF_EX = new Register();
 		IF_MEM = new Register();
 		IF_WB = new Register();
+		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
 		clockCycle = 0;
 		instructionMem = new int[400];
+		R = new Register[32];
 		for(int i = 0; i < instructionMem.length; i++){
 			instructionMem[i] = -1;
 			dataMem[i%200] = -1;
@@ -130,60 +166,7 @@ public class MIPSimulator {
 		}
 		// Imprime el programa que se va a ejecutar
 		printProgram();
-	}
-	
-	public int executeInstruction(int instruction, int X, int Y, int Z){
-		int nextPC = 0;
-		switch(instruction){
-			case 0:
-				// LL RX, n(RY)
-			break;
-			case 1:
-				// SC RX, n(RY)
-			break;
-			case 2:
-				// JR RX
-			break;
-			case 3:
-				// JAL n
-			break;
-			case 4:
-				// BEQZ RX, ETIQ
-			break;
-			case 5:
-				// BNEZ RX, ETIQ
-			break;
-			case 8:
-				// DADDI RX, RY, #n
-			break;
-			case 12:
-				// DMUL RX, RY, RZ
-			break;
-			case 14:
-				// DDIV RX, RY, RZ
-			break;
-			case 32:
-				// DADD RX, RY, RZ
-			break;
-			case 34:
-				// DSUB RX, RY, RZ
-			break;
-			case 35:
-				// LW RX, n(RY)
-			break;
-			case 43:
-				// SW RX, n(RY)
-			break;
-			case 63:
-				// FIN
-			break;
-			default:
-			break;
-		}
-		
-		return nextPC;
-	}
-	
+	}	
 	
 	/**
 	 * Despliega en consola el estado actual de:
@@ -231,8 +214,14 @@ public class MIPSimulator {
 		//El programa se ejecuta hasta toparse con una instruccion "FIN"
 		while(clockCycle == 0){//instructionMem[PC] != 63){
 			System.out.println("Ciclo: " + clockCycle);
-			PC = executeInstruction(instructionMem[PC], instructionMem[PC+1], instructionMem[PC+2], instructionMem[PC+3]);
-			clockCycle++;
+			Thread IF = new Thread(IFstage);
+			Thread ID = new Thread(IDstage);
+			Thread EX = new Thread(EXstage);
+			Thread M  = new Thread(Mstage);
+			Thread WB = new Thread(WBstage);
+			
+			IF.run();
+;			clockCycle++;
 		}
 		printState();
 	}
