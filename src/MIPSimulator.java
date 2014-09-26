@@ -149,24 +149,17 @@ public class MIPSimulator {
 		}
 	};
 	
-	
+	//En esta etapa se escribe en MEM_WB
+	//
 	private final Runnable MEMstage = new Runnable(){
 		@Override
 		public void run(){
 			switch(IR[0]){
-				case DADDI:
-				break;
-				case DADD:
-				break;
-				case DSUB:
-				break;
-				case DMUL:
-				break;
-				case DDIV:
-				break;
 				case LW:
+					MEM_WB[0] = instructionMem[EX_MEM[1]]; 
 				break;
 				case SW:
+					instructionMem[EX_MEM[1]] = MEM_WB[0];
 				break;
 			}
 			
@@ -189,7 +182,7 @@ public class MIPSimulator {
 		IF_ID = new int[4];
 		ID_EX = new int[3];
 		EX_MEM = new int[2];
-		MEM_WB = new int[1];
+		MEM_WB = new int[1]; //por
 		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
