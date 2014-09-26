@@ -2,6 +2,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Clase que simula un procesador de 1 núcleo MIPS  
@@ -62,40 +64,53 @@ public class MIPSimulator {
 	private final Runnable IDstage = new Runnable(){
 		@Override
 		public void run(){
+			Lock IDlock = new ReentrantLock();
 			while(IR[0] != FIN){
 				switch(IR[0]){
 					case DADDI:
-						IR[1] = R[IR[1]].get(); // Y
-						IR[2] = R[IR[2]].get(); // X
-						                 // IR[3]  n
+						ID_EX[0] = R[IR[1]].get(); // RY
+						ID_EX[1] = IR[2];          // X
+						ID_EX[2] = IR[3];          // n
 					break;
 					case DADD:
-						IR[1] = R[IR[1]].get(); // Y
-						                  // IR[2] Z
-						IR[3] = R[IR[3]].get(); // X
+						ID_EX[0] = R[IR[1]].get(); // RY
+						ID_EX[1] = R[IR[3]].get(); // RZ
+						ID_EX[2] = IR[3];          // X
 					break;
 					case DSUB:
-						IR[1] = R[IR[1]].get();
-						// En IR[2] se mantiene el # de registro que se necesita
-						IR[3] = R[IR[3]].get();
+						ID_EX[0] = R[IR[1]].get(); // RY
+						ID_EX[1] = R[IR[3]].get(); // RZ
+						ID_EX[2] = IR[3];          // X
 					break;
 					case DMUL:
-						IR[1] = R[IR[1]].get();
-						// En IR[2] se mantiene el # de registro que se necesita
-						IR[3] = R[IR[3]].get();
+						ID_EX[0] = R[IR[1]].get(); // RY
+						ID_EX[1] = R[IR[3]].get(); // RZ
+						ID_EX[2] = IR[3];          // X
 					break;
 					case DDIV:
-						IR[1] = R[IR[1]].get();
-						// En IR[2] se mantiene el # de registro que se necesita
-						IR[3] = R[IR[3]].get();
+						ID_EX[0] = R[IR[1]].get(); // RY
+						ID_EX[1] = R[IR[3]].get(); // RZ
+						ID_EX[2] = IR[3];          // X
 					break;
 					case LW:
+						ID_EX[0] = R[IR[1]].get(); // RY
+						ID_EX[1] = IR[2];          // X
+						ID_EX[2] = IR[3];          // n
 					break;
 					case SW:
+						ID_EX[0] = R[IR[1]].get(); // RY
+						ID_EX[1] = R[IR[2]].get(); // RX
+						ID_EX[2] = IR[3];          // n
 					break;
 					case JAL:
+						ID_EX[0] = IR[3]; // n
+						ID_EX[1] = IR[3]; // n
+						ID_EX[2] = IR[3]; // n
 					break;
 					case JR:
+						ID_EX[0] = R[IR[2]].get(); // RX
+						ID_EX[1] = 0;              // 0
+						ID_EX[2] = 0;              // 0
 					break;
 				}
 			}
