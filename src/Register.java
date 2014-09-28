@@ -6,22 +6,22 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  */
 public class Register {
-	private int content;
+	private int value;
 	public Lock lock;
 	
 	/**
 	 * Crea una instancia de clase Register.
 	 */
 	public Register() {
-		content = -1;
+		value = 0;
 		lock = new ReentrantLock();
 	}
 	
-	public void set(int content){
-		this.content = content;
+	public void set(int val){
+		this.value = val;
 	}
 
 	public int get(){
-		return content;
+		return value;
 	}
 }
