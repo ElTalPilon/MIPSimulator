@@ -23,7 +23,11 @@ public class MIPSimulator {
 	private int[] ID_EX = {-1,-1,-1};
 	private int[] EX_MEM = {-1,-1};
 	private int[] MEM_WB = {-1,-1};
-	
+	//private int[] Op_Code = {-1,-1,-1,-1}; //El codigo de operación es accesible en cada stage
+	private int opCode_IF_ID;
+	private int opCode_ID_EX;
+	private int opCode_EX_MEM;
+	private int opCode_MEM_WB;
 	private final int DADDI = 8;
 	private final int DADD = 32;
 	private final int DSUB = 34;
@@ -39,10 +43,10 @@ public class MIPSimulator {
 	public MIPSimulator(){
 		PC = 0;
 		IR = new int[4];
-		//IF_ID = new int[4];		
-		//ID_EX = new int[3];
-		//EX_MEM = new int[2];
-		//MEM_WB = new int[2];
+		opCode_IF_ID = -1;
+		opCode_ID_EX = -1;
+		opCode_EX_MEM = -1;
+		opCode_MEM_WB = -1;
 		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
@@ -56,8 +60,6 @@ public class MIPSimulator {
 				R[i] = new Register();
 			}
 		}
-		dataMem[2] = 4;
-		R[3].set(10);
 	}
 	
 	/**
@@ -68,9 +70,8 @@ public class MIPSimulator {
 	private final Runnable IFstage = new Runnable(){
 		@Override
 		public void run(){
-			//while(runningID){
-				// Guarda la instrucción a ejecutar en IR
-				for(int i = 0; i < 4; ++i){
+			while(opCode_IF_ID != FIN){ //este codigo de operacion se escribe en WBstage
+				for(int i = 0; i < 4; ++i){// Guarda la instrucción a ejecutar en IR
 					IR[i] = instructionMem[PC+i];
 					IF_ID[i] = IR[i];
 				}
@@ -79,7 +80,8 @@ public class MIPSimulator {
 				
 				// Aumenta el PC
 				PC += 4;
-			//}
+			}
+			
 		}
 	};
 	
@@ -91,7 +93,8 @@ public class MIPSimulator {
 	private final Runnable IDstage = new Runnable(){
 		@Override
 		public void run(){
-			while(IR[0] != FIN){
+			opCode_ID_EX = IF_ID[0]; //obtiene el codigo de operacion del IR, que esta en IF_ID
+			while(opCode_ID_EX != FIN){
 				switch(IR[0]){
 				case DADDI:
 					ID_EX[0] = R[IR[1]].get(); // RY
@@ -128,11 +131,12 @@ public class MIPSimulator {
 					ID_EX[1] = R[IR[2]].get(); 	// Origen
 					ID_EX[2] = R[IR[1]].get();	// Destino
 				break;
-			}//fin del switch
-			}
-			runningID = false;	
-		}
-	};
+				}//fin del switch
+			
+			}//fin del while
+			
+		}//fin del run
+	};//fin del IDstage
 	
 	/** 
 	 * En esta etapa se escribe en EX_M
@@ -141,88 +145,97 @@ public class MIPSimulator {
 	private final Runnable EXstage = new Runnable(){
 		@Override
 		public void run(){
-			switch(IR[0]){
-			case DADDI:
-				EX_MEM[0] = ID_EX[0]+ID_EX[2];
-				EX_MEM[1] = ID_EX[1]; //como escribe en registro, el campo de memoria va vacio
-			break;
-			case DADD:
-				EX_MEM[0] = ID_EX[0] + ID_EX[1];
-				EX_MEM[1] = ID_EX[2];
-			break;
-			case DSUB:
-				EX_MEM[0] = ID_EX[0] - ID_EX[1];
-				EX_MEM[1] = ID_EX[2];
-			break;
-			case DMUL:
-				EX_MEM[0] = ID_EX[0] * ID_EX[1];
-				EX_MEM[1] = ID_EX[2];
-			break;
-			case DDIV:
-				EX_MEM[0] = ID_EX[0] / ID_EX[1];
-				EX_MEM[1] = ID_EX[2];
-			break;
-			case LW:
-				EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
-				EX_MEM[1] = ID_EX[2];			//Destino
-			break;
-			case SW:
-				EX_MEM[0] = ID_EX[0]+ID_EX[2];	//Resultado de memoria del ALU
-				EX_MEM[1] = ID_EX[1];			//Destino
-			break;
-		}			
-		}
-	};
+			opCode_EX_MEM = opCode_ID_EX; //lee el codigo de operacion de la etapa anterior
+			while(opCode_EX_MEM != FIN){
+				switch(IR[0]){
+				case DADDI:
+					EX_MEM[0] = ID_EX[0]+ID_EX[2];
+					EX_MEM[1] = ID_EX[1]; //como escribe en registro, el campo de memoria va vacio
+				break;
+				case DADD:
+					EX_MEM[0] = ID_EX[0] + ID_EX[1];
+					EX_MEM[1] = ID_EX[2];
+				break;
+				case DSUB:
+					EX_MEM[0] = ID_EX[0] - ID_EX[1];
+					EX_MEM[1] = ID_EX[2];
+				break;
+				case DMUL:
+					EX_MEM[0] = ID_EX[0] * ID_EX[1];
+					EX_MEM[1] = ID_EX[2];
+				break;
+				case DDIV:
+					EX_MEM[0] = ID_EX[0] / ID_EX[1];
+					EX_MEM[1] = ID_EX[2];
+				break;
+				case LW:
+					EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
+					EX_MEM[1] = ID_EX[2];			//Destino
+				break;
+				case SW:
+					EX_MEM[0] = ID_EX[0]+ID_EX[2];	//Resultado de memoria del ALU
+					EX_MEM[1] = ID_EX[1];			//Destino
+				break;
+				}//fin del switch
+			}//fin del while
+		}//fin del run
+	};//fin de EXstage
 	
 	//En esta etapa se escribe en MEM_WB
-	//
 	private final Runnable MEMstage = new Runnable(){
 		@Override
 		public void run(){
-			switch(IR[0]){
-			case LW:
-				MEM_WB[0] = dataMem[EX_MEM[0]]; //
-				MEM_WB[1] = EX_MEM[1];			//
-			break;
-			case SW:
-				dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
-				MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
-				MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-			break;
-			default:
-				MEM_WB[0] = EX_MEM[0];
-				MEM_WB[1] = EX_MEM[1];
-			}			
+			opCode_MEM_WB = opCode_EX_MEM; //obtiene el codigo de operacion de la etapa anterior
+			while(opCode_MEM_WB != FIN){
+				switch(IR[0]){
+				case LW:
+					MEM_WB[0] = dataMem[EX_MEM[0]]; //
+					MEM_WB[1] = EX_MEM[1];			//
+				break;
+				case SW:
+					dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
+					MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
+					MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
+				break;
+				default:
+					MEM_WB[0] = EX_MEM[0];
+					MEM_WB[1] = EX_MEM[1];
+				break;
+				}//fin del switch
+			}//fin del while
 		}//fin del run
-	};
+	};//fin de MEMstage
 	
 	private final Runnable WBstage = new Runnable(){
 		@Override
 		public void run(){
-			switch(IR[0]){
-			case DADDI:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DADD:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DSUB:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DMUL:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DDIV:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case LW:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			//en RW no hace nada en la etapa de writeback
-			}//fin del switch
-		}
-		
-	};
+			while(opCode_MEM_WB != FIN){
+				switch(IR[0]){
+				case DADDI:
+					R[MEM_WB[1]].set(MEM_WB[0]);
+				break;
+				case DADD:
+					R[MEM_WB[1]].set(MEM_WB[0]);
+				break;
+				case DSUB:
+					R[MEM_WB[1]].set(MEM_WB[0]);
+				break;
+				case DMUL:
+					R[MEM_WB[1]].set(MEM_WB[0]);
+				break;
+				case DDIV:
+					R[MEM_WB[1]].set(MEM_WB[0]);
+				break;
+				case LW:
+					R[MEM_WB[1]].set(MEM_WB[0]);
+				break;
+				//en RW no hace nada en la etapa de writeback
+				}//fin del switch
+			}//fin del while
+			//antes de morir, escribe en opCode_IF_ID para que IFstage tambien muera
+			opCode_IF_ID = FIN;
+		}//fin del run
+	};//fin del WBstage
 	
 	/**
 	 * Ejecuta el programa especificado.
