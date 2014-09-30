@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
@@ -43,6 +44,7 @@ public class MIPSimulator {
 	private static Semaphore semEx = new Semaphore(1);
 	private static Semaphore semMem = new Semaphore(1);
 	private static Semaphore semR = new Semaphore(1);
+	static CyclicBarrier barrier = new CyclicBarrier(6);
 	
 	//booleanos para saber si etapas estan vivas
 	private boolean ifAlive;
@@ -91,8 +93,8 @@ public class MIPSimulator {
 	private final Runnable IFstage = new Runnable(){
 		@Override
 		public void run(){
-			while(ifAlive){
-				
+			while(ifAlive == true){
+				System.out.println("ENTRO RNTO ENTRO");
 				if(IR[0] == FIN){
 					ifAlive = false;
 				}
@@ -110,12 +112,24 @@ public class MIPSimulator {
 					IF_ID[i] = IR[i];
 				}
 				
-				// Espera a que ID se desocupe con un lock o algo así
-				semIf.release(1);
+				//*****
+				System.out.println("ENTRO: IF_ID: " + IF_ID[0] +
+						IF_ID[1] + IF_ID[2] + IF_ID[3]);
 				// Aumenta el PC
 				PC += 4;
+				// Espera a que ID se desocupe con un lock o algo así
+				semIf.release(1);
 				
-				//revisa codigo de operacion
+				try {
+					barrier.await();
+					barrier.await();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (BrokenBarrierException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				
 				
 			}
@@ -133,6 +147,14 @@ public class MIPSimulator {
 			while(idAlive == true){
 				if(IF_ID[0] == FIN){
 					idAlive = false;
+				}
+				
+				//Si es la primera instruccion no hace nada
+				//y desbloquea la etapa hacia atras
+				if(IF_ID[0] == -1){
+					semIf.release();
+					continue;
+					
 				}
 				
 				try {
@@ -195,10 +217,22 @@ public class MIPSimulator {
 				semId.release();
 				semIf.release();
 				semR.release();
-				
+				//*****
+				System.out.println("ENTRO: ID_EX: " + ID_EX[0] +
+						ID_EX[1] + ID_EX[2] + ID_EX[3]);
+				try {
+					barrier.await();
+					barrier.await();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (BrokenBarrierException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				
 			}
-			runningID = false;	
+			//runningID = false;	
 		}
 	};
 	
@@ -214,6 +248,13 @@ public class MIPSimulator {
 				
 				if(ID_EX[3] == FIN){
 					exAlive = false;
+				}
+				
+				//Si es la primera instruccion no hace nada
+				//y desbloquea la etapa hacia atras
+				if(ID_EX[3] == -1){
+					semId.release();
+					continue;
 				}
 				
 				try {
@@ -261,6 +302,18 @@ public class MIPSimulator {
 				}//fin del switch
 				semEx.release();
 				semId.release();
+				
+				try {
+					barrier.await();
+					barrier.await();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (BrokenBarrierException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
 				}//fin del while
 			}
 			
@@ -276,6 +329,12 @@ public class MIPSimulator {
 				
 				if(EX_MEM[2] == FIN){
 					memAlive = false;
+				}
+				
+				//Si es la primera instruccion no hace nada
+				if(EX_MEM[2] == -1){
+					semEx.release();
+					continue;
 				}
 				
 				try {
@@ -305,6 +364,18 @@ public class MIPSimulator {
 				semMem.release();
 				semEx.release();
 				
+				try {
+					barrier.await();
+					barrier.await();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (BrokenBarrierException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				
 			}//fin del while
 			
 		}//fin del run
@@ -318,6 +389,12 @@ public class MIPSimulator {
 				
 				if(MEM_WB[2] == FIN){
 					wbAlive = false;
+				}
+				
+				//Si es la primera instruccion no hace nada
+				if(EX_MEM[2] == -1){
+					semMem.release();
+					continue;
 				}
 				
 				switch(MEM_WB[2]){
@@ -343,6 +420,16 @@ public class MIPSimulator {
 				}//fin del switch
 				
 				semMem.release(1);
+				try {
+					barrier.await();
+					barrier.await();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (BrokenBarrierException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				
 			}// fin del while
 			
@@ -449,7 +536,7 @@ public class MIPSimulator {
 		WB.start();
 		
 		//El programa se ejecuta hasta toparse con una instruccion "FIN"
-		while(etapasVivas() == true){//instructionMem[PC] != 63){
+		/*while(etapasVivas() == true){//instructionMem[PC] != 63){
 			//System.out.println("Ciclo: " + clockCycle);
 			iniciarSemaforos();
 			
@@ -457,7 +544,27 @@ public class MIPSimulator {
 			clockCycle++;
 			printState();
 		}
+		printState();*/
+		
+		while(etapasVivas() == true){
+			try {
+				barrier.await();
+				iniciarSemaforos();
+				
+				semR.acquire();
+				barrier.await();
+				printState();
+				
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (BrokenBarrierException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 		printState();
+		
 	}
 	
 	
@@ -475,4 +582,5 @@ public class MIPSimulator {
 	
 	
 	
+
 }//fin de la clase
