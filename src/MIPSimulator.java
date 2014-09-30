@@ -2,6 +2,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -18,16 +19,13 @@ public class MIPSimulator {
 	private int PC;               // Contador del programa / Puntero de instrucciones
 	private boolean runningID;
 	
+	//en la ultima posicion se pasa el operation code
 	private int[] IR;
 	private int[] IF_ID = {-1,-1,-1,-1};
-	private int[] ID_EX = {-1,-1,-1};
-	private int[] EX_MEM = {-1,-1};
-	private int[] MEM_WB = {-1,-1};
-	//private int[] Op_Code = {-1,-1,-1,-1}; //El codigo de operación es accesible en cada stage
-	private int opCode_IF_ID;
-	private int opCode_ID_EX;
-	private int opCode_EX_MEM;
-	private int opCode_MEM_WB;
+	private int[] ID_EX = {-1,-1,-1, -1};
+	private int[] EX_MEM = {-1,-1, -1};
+	private int[] MEM_WB = {-1,-1, -1};
+	
 	private final int DADDI = 8;
 	private final int DADD = 32;
 	private final int DSUB = 34;
@@ -37,16 +35,32 @@ public class MIPSimulator {
 	private final int SW = 43;
 	private final int FIN = 63;
 	
+	private int opCode = -1;
+	
+	//semaforos por cada etapa
+	private static Semaphore semIf = new Semaphore(1);
+	private static Semaphore semId = new Semaphore(1);
+	private static Semaphore semEx = new Semaphore(1);
+	private static Semaphore semMem = new Semaphore(1);
+	private static Semaphore semR = new Semaphore(1);
+	
+	//booleanos para saber si etapas estan vivas
+	private boolean ifAlive;
+	private boolean idAlive;
+	private boolean exAlive;
+	private boolean memAlive;
+	private boolean wbAlive;
+	
 	/**
 	 * Construye una instancia de MIPSimulator e inicializa sus atributos.
 	 */
 	public MIPSimulator(){
 		PC = 0;
 		IR = new int[4];
-		opCode_IF_ID = -1;
-		opCode_ID_EX = -1;
-		opCode_EX_MEM = -1;
-		opCode_MEM_WB = -1;
+		//IF_ID = new int[4];		
+		//ID_EX = new int[3];
+		//EX_MEM = new int[2];
+		//MEM_WB = new int[2];
 		runningID = true;
 		clock = new CyclicBarrier(4); // El 4 no sé...
 		dataMem = new int[200];
@@ -60,6 +74,13 @@ public class MIPSimulator {
 				R[i] = new Register();
 			}
 		}
+		
+		//todos empezarian con vida
+		idAlive = true;
+		ifAlive = true;
+		exAlive = true;
+		memAlive = true;
+		wbAlive = true;
 	}
 	
 	/**
@@ -70,18 +91,34 @@ public class MIPSimulator {
 	private final Runnable IFstage = new Runnable(){
 		@Override
 		public void run(){
-			while(opCode_IF_ID != FIN){ //este codigo de operacion se escribe en WBstage
-				for(int i = 0; i < 4; ++i){// Guarda la instrucción a ejecutar en IR
+			while(ifAlive){
+				
+				if(IR[0] == FIN){
+					ifAlive = false;
+				}
+				
+				// Guarda la instrucción a ejecutar en IR
+				try {
+					semIf.acquire();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				for(int i = 0; i < 4; ++i){
 					IR[i] = instructionMem[PC+i];
 					IF_ID[i] = IR[i];
 				}
 				
 				// Espera a que ID se desocupe con un lock o algo así
-				
+				semIf.release(1);
 				// Aumenta el PC
 				PC += 4;
+				
+				//revisa codigo de operacion
+				
+				
 			}
-			
 		}
 	};
 	
@@ -93,50 +130,77 @@ public class MIPSimulator {
 	private final Runnable IDstage = new Runnable(){
 		@Override
 		public void run(){
-			opCode_ID_EX = IF_ID[0]; //obtiene el codigo de operacion del IR, que esta en IF_ID
-			while(opCode_ID_EX != FIN){
-				switch(IR[0]){
+			while(idAlive == true){
+				if(IF_ID[0] == FIN){
+					idAlive = false;
+				}
+				
+				try {
+					semId.acquire();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				try {
+					semR.acquire();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				switch(IF_ID[0]){
 				case DADDI:
-					ID_EX[0] = R[IR[1]].get(); // RY
-					ID_EX[1] = IR[2];          // X
-					ID_EX[2] = IR[3];          // n
+					ID_EX[0] = R[IF_ID[1]].get(); // RY
+					ID_EX[1] = IF_ID[2];          // X
+					ID_EX[2] = IF_ID[3];          // n
+					ID_EX[3] = IF_ID[0];			//operation code
 				break;
 				case DADD:
-					ID_EX[0] = R[IR[1]].get(); // Reg Operando1
-					ID_EX[1] = R[IR[2]].get(); // Reg Operando2
-					ID_EX[2] = IR[3];          // Reg Destino
+					ID_EX[0] = R[IF_ID[1]].get(); // Reg Operando1
+					ID_EX[1] = R[IF_ID[2]].get(); // Reg Operando2
+					ID_EX[2] = IF_ID[3];          // Reg Destino
+					ID_EX[3] = IF_ID[0];			//operation code
 				break;
 				case DSUB:
-					ID_EX[0] = R[IR[1]].get(); // Reg Operando1
-					ID_EX[1] = R[IR[2]].get(); // Reg Operando2
-					ID_EX[2] = IR[3];          // Reg Destino
+					ID_EX[0] = R[IF_ID[1]].get(); // Reg Operando1
+					ID_EX[1] = R[IF_ID[2]].get(); // Reg Operando2
+					ID_EX[2] = IF_ID[3];          // Reg Destino
+					ID_EX[3] = IF_ID[0];			//operation code
 				break;
 				case DMUL:
-					ID_EX[0] = R[IR[1]].get(); // Reg Operando1
-					ID_EX[1] = R[IR[2]].get(); // Reg Operando2
-					ID_EX[2] = IR[3];          // Reg Operando3
+					ID_EX[0] = R[IF_ID[1]].get(); // Reg Operando1
+					ID_EX[1] = R[IF_ID[2]].get(); // Reg Operando2
+					ID_EX[2] = IF_ID[3];          // Reg Operando3
+					ID_EX[3] = IF_ID[0];			//operation code
 				break;
 				case DDIV:
-					ID_EX[0] = R[IR[1]].get();	// Reg Operando1
-					ID_EX[1] = R[IR[2]].get();	// Reg Operando2
-					ID_EX[2] = IR[3];			// Reg Operando3
+					ID_EX[0] = R[IF_ID[1]].get();	// Reg Operando1
+					ID_EX[1] = R[IF_ID[2]].get();	// Reg Operando2
+					ID_EX[2] = IF_ID[3];			// Reg Operando3
+					ID_EX[3] = IF_ID[0];			//operation code
 				break;
 				case LW:
-					ID_EX[0] = IR[3]; 			// valor inmediato
-					ID_EX[1] = R[IR[1]].get();  // Origen
-					ID_EX[2] = IR[2];          	// Destino
+					ID_EX[0] = IF_ID[3]; 			// valor inmediato
+					ID_EX[1] = R[IF_ID[1]].get();  // Origen
+					ID_EX[2] = IF_ID[2];          	// Destino
+					ID_EX[3] = IF_ID[0];			//operation code
 				break;
 				case SW:
-					ID_EX[0] = IR[3]; 			// valor inmediato
-					ID_EX[1] = R[IR[2]].get(); 	// Origen
-					ID_EX[2] = R[IR[1]].get();	// Destino
+					ID_EX[0] = IF_ID[3]; 			// valor inmediato
+					ID_EX[1] = R[IF_ID[2]].get(); 	// Origen
+					ID_EX[2] = R[IF_ID[1]].get();	// Destino
+					ID_EX[3] = IF_ID[0];			//operation code
 				break;
-				}//fin del switch
-			
-			}//fin del while
-			
-		}//fin del run
-	};//fin del IDstage
+			  }//fin del switch
+				semId.release();
+				semIf.release();
+				semR.release();
+				
+				
+			}
+			runningID = false;	
+		}
+	};
 	
 	/** 
 	 * En esta etapa se escribe en EX_M
@@ -145,97 +209,146 @@ public class MIPSimulator {
 	private final Runnable EXstage = new Runnable(){
 		@Override
 		public void run(){
-			opCode_EX_MEM = opCode_ID_EX; //lee el codigo de operacion de la etapa anterior
-			while(opCode_EX_MEM != FIN){
-				switch(IR[0]){
-				case DADDI:
-					EX_MEM[0] = ID_EX[0]+ID_EX[2];
-					EX_MEM[1] = ID_EX[1]; //como escribe en registro, el campo de memoria va vacio
-				break;
-				case DADD:
-					EX_MEM[0] = ID_EX[0] + ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case DSUB:
-					EX_MEM[0] = ID_EX[0] - ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case DMUL:
-					EX_MEM[0] = ID_EX[0] * ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case DDIV:
-					EX_MEM[0] = ID_EX[0] / ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case LW:
-					EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
-					EX_MEM[1] = ID_EX[2];			//Destino
-				break;
-				case SW:
-					EX_MEM[0] = ID_EX[0]+ID_EX[2];	//Resultado de memoria del ALU
-					EX_MEM[1] = ID_EX[1];			//Destino
-				break;
+			
+			while(exAlive == true){
+				
+				if(ID_EX[3] == FIN){
+					exAlive = false;
+				}
+				
+				try {
+					semEx.acquire();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				switch(ID_EX[3]){
+					case DADDI:
+						EX_MEM[0] = ID_EX[0]+ID_EX[2];
+						EX_MEM[1] = ID_EX[1]; //como escribe en registro, el campo de memoria va vacio
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
+					case DADD:
+						EX_MEM[0] = ID_EX[0] + ID_EX[1];
+						EX_MEM[1] = ID_EX[2];
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
+					case DSUB:
+						EX_MEM[0] = ID_EX[0] - ID_EX[1];
+						EX_MEM[1] = ID_EX[2];
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
+					case DMUL:
+						EX_MEM[0] = ID_EX[0] * ID_EX[1];
+						EX_MEM[1] = ID_EX[2];
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
+					case DDIV:
+						EX_MEM[0] = ID_EX[0] / ID_EX[1];
+						EX_MEM[1] = ID_EX[2];
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
+					case LW:
+						EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
+						EX_MEM[1] = ID_EX[2];			//Destino
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
+					case SW:
+						EX_MEM[0] = ID_EX[0]+ID_EX[2];	//Resultado de memoria del ALU
+						EX_MEM[1] = ID_EX[1];			//Destino
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
 				}//fin del switch
-			}//fin del while
-		}//fin del run
-	};//fin de EXstage
+				semEx.release();
+				semId.release();
+				}//fin del while
+			}
+			
+	};
 	
 	//En esta etapa se escribe en MEM_WB
+	//
 	private final Runnable MEMstage = new Runnable(){
 		@Override
 		public void run(){
-			opCode_MEM_WB = opCode_EX_MEM; //obtiene el codigo de operacion de la etapa anterior
-			while(opCode_MEM_WB != FIN){
-				switch(IR[0]){
-				case LW:
-					MEM_WB[0] = dataMem[EX_MEM[0]]; //
-					MEM_WB[1] = EX_MEM[1];			//
-				break;
-				case SW:
-					dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
-					MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
-					MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-				break;
-				default:
-					MEM_WB[0] = EX_MEM[0];
-					MEM_WB[1] = EX_MEM[1];
-				break;
+			
+			while(memAlive == true){
+				
+				if(EX_MEM[2] == FIN){
+					memAlive = false;
+				}
+				
+				try {
+					semMem.acquire();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				switch(EX_MEM[2]){
+					case LW:
+						MEM_WB[0] = dataMem[EX_MEM[0]]; //
+						MEM_WB[1] = EX_MEM[1];			//
+						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion
+					break;
+					case SW:
+						dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
+						MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
+						MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
+						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion
+					break;
+					default:
+						MEM_WB[0] = EX_MEM[0];
+						MEM_WB[1] = EX_MEM[1];
+						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion
 				}//fin del switch
+				
+				semMem.release();
+				semEx.release();
+				
 			}//fin del while
+			
 		}//fin del run
-	};//fin de MEMstage
+	};
 	
 	private final Runnable WBstage = new Runnable(){
 		@Override
 		public void run(){
-			while(opCode_MEM_WB != FIN){
-				switch(IR[0]){
-				case DADDI:
-					R[MEM_WB[1]].set(MEM_WB[0]);
-				break;
-				case DADD:
-					R[MEM_WB[1]].set(MEM_WB[0]);
-				break;
-				case DSUB:
-					R[MEM_WB[1]].set(MEM_WB[0]);
-				break;
-				case DMUL:
-					R[MEM_WB[1]].set(MEM_WB[0]);
-				break;
-				case DDIV:
-					R[MEM_WB[1]].set(MEM_WB[0]);
-				break;
-				case LW:
-					R[MEM_WB[1]].set(MEM_WB[0]);
-				break;
-				//en RW no hace nada en la etapa de writeback
+			
+			while(wbAlive == true){
+				
+				if(MEM_WB[2] == FIN){
+					wbAlive = false;
+				}
+				
+				switch(MEM_WB[2]){
+					case DADDI:
+						R[MEM_WB[1]].set(MEM_WB[0]);
+					break;
+					case DADD:
+						R[MEM_WB[1]].set(MEM_WB[0]);
+					break;
+					case DSUB:
+						R[MEM_WB[1]].set(MEM_WB[0]);
+					break;
+					case DMUL:
+						R[MEM_WB[1]].set(MEM_WB[0]);
+					break;
+					case DDIV:
+						R[MEM_WB[1]].set(MEM_WB[0]);
+					break;
+					case LW:
+						R[MEM_WB[1]].set(MEM_WB[0]);
+					break;
+					//en RW no hace nada en la etapa de writeback
 				}//fin del switch
-			}//fin del while
-			//antes de morir, escribe en opCode_IF_ID para que IFstage tambien muera
-			opCode_IF_ID = FIN;
-		}//fin del run
-	};//fin del WBstage
+				
+				semMem.release(1);
+				
+			}// fin del while
+			
+		}
+		
+	};
 	
 	/**
 	 * Ejecuta el programa especificado.
@@ -280,7 +393,7 @@ public class MIPSimulator {
 			System.out.println();
 		}
 		
-		System.out.print("\nPC: " + PC + "\n");
+		/*System.out.print("\nPC: " + PC + "\n");
 		
 		System.out.print("IR: ");
 		for(int i=0; i<4; ++i){
@@ -291,7 +404,7 @@ public class MIPSimulator {
 		System.out.println("\nIF_ID: " + IF_ID[0] + ", " + IF_ID[1] + ", " + IF_ID[2] + ", " + IF_ID[3]);
 		System.out.println("ID_EX: " + ID_EX[0] + ", " + ID_EX[1] + ", " + ID_EX[2]);
 		System.out.println("EX_MEM: " + EX_MEM[0] + ", " + EX_MEM[1]);
-		System.out.println("MEM_WB: " + MEM_WB[0] + ", " + MEM_WB[1]);
+		System.out.println("MEM_WB: " + MEM_WB[0] + ", " + MEM_WB[1]);*/
 	}
 	
 	/**
@@ -314,185 +427,50 @@ public class MIPSimulator {
 		}
 	}
 
+	public void iniciarSemaforos(){
+		semId.drainPermits();
+		semIf.drainPermits();
+		semMem.drainPermits();
+		semEx.drainPermits();
+	}
+	
 	public void runProgram() {
 		
+		iniciarSemaforos();
+		Thread IF = new Thread(IFstage);
+		Thread ID = new Thread(IDstage);
+		Thread EX = new Thread(EXstage);
+		Thread M  = new Thread(MEMstage);
+		Thread WB = new Thread(WBstage);
+		IF.start();
+		ID.start();
+		EX.start();
+		M.start();
+		WB.start();
+		
 		//El programa se ejecuta hasta toparse con una instruccion "FIN"
-		while(clockCycle == 0){//instructionMem[PC] != 63){
-			System.out.println("Ciclo: " + clockCycle);
-			Thread IF = new Thread(IFstage);
-			Thread ID = new Thread(IDstage);
-			Thread EX = new Thread(EXstage);
-			Thread M  = new Thread(MEMstage);
-			Thread WB = new Thread(WBstage);
+		while(etapasVivas() == true){//instructionMem[PC] != 63){
+			//System.out.println("Ciclo: " + clockCycle);
+			iniciarSemaforos();
 			
-			IF.start();
-;			clockCycle++;
+			
+			clockCycle++;
+			printState();
 		}
 		printState();
 	}
 	
 	
-	
-	
-	public void fetch(){
-		//@Override
-		//public void run(){
-			//while(runningID){
-				// Guarda la instrucción a ejecutar en IR
-				for(int i = 0; i < 4; ++i){
-					IR[i] = instructionMem[PC+i];
-					IF_ID[i] = IR[i];
-				}
-				
-				// Espera a que ID se desocupe con un lock o algo así
-				
-				// Aumenta el PC
-				PC += 4;
-			//}
-		//}
-	};
-	
-	/**
-	 * Instancia de runnable que se encargara de la etapa ID del pipeline.
-	 * En esta etapa se decodifica la instrucción, se obtienen la información
-	 * necesaria, ya sea en registros o en memoria de datos.
-	 */
-	public void decode(){
-		//@Override
-		//public void run(){
-			//while(IR[0] != FIN){
-				switch(IR[0]){
-					case DADDI:
-						ID_EX[0] = R[IR[1]].get(); // RY
-						ID_EX[1] = IR[2];          // X
-						ID_EX[2] = IR[3];          // n
-					break;
-					case DADD:
-						ID_EX[0] = R[IR[1]].get(); // Reg Operando1
-						ID_EX[1] = R[IR[2]].get(); // Reg Operando2
-						ID_EX[2] = IR[3];          // Reg Destino
-					break;
-					case DSUB:
-						ID_EX[0] = R[IR[1]].get(); // Reg Operando1
-						ID_EX[1] = R[IR[2]].get(); // Reg Operando2
-						ID_EX[2] = IR[3];          // Reg Destino
-					break;
-					case DMUL:
-						ID_EX[0] = R[IR[1]].get(); // Reg Operando1
-						ID_EX[1] = R[IR[2]].get(); // Reg Operando2
-						ID_EX[2] = IR[3];          // Reg Operando3
-					break;
-					case DDIV:
-						ID_EX[0] = R[IR[1]].get();	// Reg Operando1
-						ID_EX[1] = R[IR[2]].get();	// Reg Operando2
-						ID_EX[2] = IR[3];			// Reg Operando3
-					break;
-					case LW:
-						ID_EX[0] = IR[3]; 			// valor inmediato
-						ID_EX[1] = R[IR[1]].get();  // Origen
-						ID_EX[2] = IR[2];          	// Destino
-					break;
-					case SW:
-						ID_EX[0] = IR[3]; 			// valor inmediato
-						ID_EX[1] = R[IR[2]].get(); 	// Origen
-						ID_EX[2] = R[IR[1]].get();	// Destino
-					break;
-				}//fin del switch
-			//}
-			//runningID = false;	
-		//}
-	};
-	
-	/** 
-	 * En esta etapa se escribe en EX_M
-	 * debe verificar que EX_M no este bloqueado
-	 */
-	public void execute(){
-		//@Override
-		//public void run(){
-			switch(IR[0]){
-				case DADDI:
-					EX_MEM[0] = ID_EX[0]+ID_EX[2];
-					EX_MEM[1] = ID_EX[1]; //como escribe en registro, el campo de memoria va vacio
-				break;
-				case DADD:
-					EX_MEM[0] = ID_EX[0] + ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case DSUB:
-					EX_MEM[0] = ID_EX[0] - ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case DMUL:
-					EX_MEM[0] = ID_EX[0] * ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case DDIV:
-					EX_MEM[0] = ID_EX[0] / ID_EX[1];
-					EX_MEM[1] = ID_EX[2];
-				break;
-				case LW:
-					EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
-					EX_MEM[1] = ID_EX[2];			//Destino
-				break;
-				case SW:
-					EX_MEM[0] = ID_EX[0]+ID_EX[2];	//Resultado de memoria del ALU
-					EX_MEM[1] = ID_EX[1];			//Destino
-				break;
-			}		
-		//}
-	};
-	
-	//En esta etapa se escribe en MEM_WB
-	//
-	public void memory(){
-		//@Override
-		//public void run(){
-			switch(IR[0]){
-				case LW:
-					MEM_WB[0] = dataMem[EX_MEM[0]]; //
-					MEM_WB[1] = EX_MEM[1];			//
-				break;
-				case SW:
-					dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
-					MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
-					MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-				break;
-				default:
-					MEM_WB[0] = EX_MEM[0];
-					MEM_WB[1] = EX_MEM[1];
-			}
-			
-		//}
-	};
-	
-	public void writeBack(){
-		//@Override
-		//public void run(){
-		switch(IR[0]){
-			case DADDI:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DADD:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DSUB:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DMUL:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case DDIV:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			case LW:
-				R[MEM_WB[1]].set(MEM_WB[0]);
-			break;
-			//en RW no hace nada en la etapa de writeback
+	private boolean etapasVivas(){
+		//mientras alguna viva el principal seguira
+		// ejecutandose
+		if(ifAlive || idAlive || exAlive || memAlive || wbAlive){
+			return true;
 		}
-		//}
-		
-	};
+		return false;
+	}
+	
+	
 	
 	
 	
