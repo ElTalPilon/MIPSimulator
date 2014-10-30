@@ -44,6 +44,8 @@ public class MIPSimulator {
 	private static Semaphore semEx = new Semaphore(1);
 	private static Semaphore semMem = new Semaphore(1);
 	private static Semaphore semR = new Semaphore(1);
+	
+	// Semaforo para controlar cada ciclo del reloj
 	static CyclicBarrier barrier = new CyclicBarrier(6);
 	
 	//booleanos para saber si etapas estan vivas
@@ -94,21 +96,26 @@ public class MIPSimulator {
 		@Override
 		public void run(){
 			while(ifAlive == true){
-				System.out.println("ENTRO RNTO ENTRO");
+				
 				if(IR[0] == FIN){
 					ifAlive = false;
 				}
 				
+				
+				
+				for(int i = 0; i < 4; ++i){
+					IR[i] = instructionMem[PC+i];
+				}
+				
 				// Guarda la instrucción a ejecutar en IR
+				// hasta que ID este desocupado se ejecuta
 				try {
 					semIf.acquire();
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-				
 				for(int i = 0; i < 4; ++i){
-					IR[i] = instructionMem[PC+i];
 					IF_ID[i] = IR[i];
 				}
 				
@@ -156,7 +163,8 @@ public class MIPSimulator {
 					continue;
 					
 				}
-				
+				//*****
+				System.out.println("ENtro ID");
 				try {
 					semId.acquire();
 				} catch (InterruptedException e) {
@@ -420,6 +428,7 @@ public class MIPSimulator {
 				}//fin del switch
 				
 				semMem.release(1);
+				semR.release();
 				try {
 					barrier.await();
 					barrier.await();
@@ -535,22 +544,15 @@ public class MIPSimulator {
 		M.start();
 		WB.start();
 		
-		//El programa se ejecuta hasta toparse con una instruccion "FIN"
-		/*while(etapasVivas() == true){//instructionMem[PC] != 63){
-			//System.out.println("Ciclo: " + clockCycle);
-			iniciarSemaforos();
-			
-			
-			clockCycle++;
-			printState();
-		}
-		printState();*/
-		
 		while(etapasVivas() == true){
 			try {
+				
+				// esperar que se ejecuten todos y entrar
 				barrier.await();
+				//vuelve a iniciar los semaforos, es decir bloquea los intermedios
 				iniciarSemaforos();
 				
+				// bloquea los registros
 				semR.acquire();
 				barrier.await();
 				printState();
@@ -576,11 +578,7 @@ public class MIPSimulator {
 		}
 		return false;
 	}
+}
 	
 	
 	
-	
-	
-	
-
-}//fin de la clase
