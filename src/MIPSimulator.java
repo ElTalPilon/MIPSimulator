@@ -1,5 +1,6 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.text.DecimalFormat;
 import java.util.Scanner;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
@@ -12,9 +13,23 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 //
 public class MIPSimulator {
+	private final int tamMemInstrucciones = 768;//768 / 4 = 192 instrucciones / 4 = 48 bloques
+	private final int tamMemDatos = 832; 		//se asume que cada entero es de 4 bytes
+	private final int numBloquesCache = 8;		//el cache tiene 8 bloques
+	private final int DADDI = 8;
+	private final int DADD 	= 32;
+	private final int DSUB 	= 34;
+	private final int DMUL 	= 12;
+	private final int DDIV 	= 14;
+	private final int LW 	= 35;
+	private final int SW 	= 43;
+	private final int FIN 	= 63;
+	
+	private Register[] R;		  // Registros del procesador
 	private int[] instructionMem; // Memoria de instrucciones
 	private int[] dataMem;        // Memoria de datos
-	private Register[] R;		  // Registros del procesador
+	private Bloque[] cache;			//cache del mips, formada de 8 bloques de 16 enteros c/u
+	
 	private CyclicBarrier clock;  // Reloj del sistema
 	private int clockCycle;       // Ciclo actual de reloj
 	private int PC;               // Contador del programa / Puntero de instrucciones
@@ -26,15 +41,6 @@ public class MIPSimulator {
 	private int[] ID_EX = {-1,-1,-1, -1};
 	private int[] EX_MEM = {-1,-1, -1};
 	private int[] MEM_WB = {-1,-1, -1};
-	
-	private final int DADDI = 8;
-	private final int DADD = 32;
-	private final int DSUB = 34;
-	private final int DMUL = 12;
-	private final int DDIV = 14;
-	private final int LW = 35;
-	private final int SW = 43;
-	private final int FIN = 63;
 	
 	private int opCode = -1;
 	
@@ -55,29 +61,36 @@ public class MIPSimulator {
 	private boolean memAlive;
 	private boolean wbAlive;
 	
-	/**
-	 * Construye una instancia de MIPSimulator e inicializa sus atributos.
-	 */
+	//Constructor de la clase
 	public MIPSimulator(){
-		PC = 0;
-		IR = new int[4];
-		//IF_ID = new int[4];		
-		//ID_EX = new int[3];
-		//EX_MEM = new int[2];
-		//MEM_WB = new int[2];
-		runningID = true;
-		clock = new CyclicBarrier(4); // El 4 no sé...
-		dataMem = new int[200];
-		clockCycle = 0;
-		instructionMem = new int[400];
+		//se inicializan los registros
 		R = new Register[32];
-		for(int i = 0; i < instructionMem.length; i++){
-			instructionMem[i] = 0;
-			dataMem[i%200] = 0;
-			if(i < 32){
-				R[i] = new Register();
-			}
+		for(int i=0; i<32; ++i){
+			R[i] = new Register();
 		}
+		//se inicializa la memoria de instrucciones
+		instructionMem = new int[tamMemInstrucciones];
+		for(int i=0; i<tamMemInstrucciones; ++i){
+			instructionMem[i] = 0;
+		}
+		//se inicializa la memoria de datos
+		dataMem = new int[tamMemDatos];
+		for(int i=0; i<tamMemDatos; ++i){
+			dataMem[i] = 1;	//SE INICIALIZA EN 1 PARA SIMULAR QUE LOS CANDADOS
+							//FUERON INICIADOS POR EL HILO PRINCIPAL
+		}
+		//se inicializa la cache
+		cache = new Bloque[numBloquesCache];
+		for(int i=0; i<numBloquesCache; ++i){
+			cache[i] = new Bloque();
+		}
+		
+		clock = new CyclicBarrier(4); // El 4 no sé...
+		clockCycle = 0;
+		PC = 0;
+		runningID = true;
+		
+		IR = new int[4];
 		
 		//todos empezarian con vida
 		idAlive = true;
@@ -351,18 +364,58 @@ public class MIPSimulator {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				
+				boolean direccionValida;
+				int bloqueMem, bloqueCache;
 				switch(EX_MEM[2]){
 					case LW:
+						/*codigo viejo, sin implementacion de cache
 						MEM_WB[0] = dataMem[EX_MEM[0]]; //
 						MEM_WB[1] = EX_MEM[1];			//
-						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion
+						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion */
+						
+						//primero hay que verificar que la direccion que se tratará de leer sea valida
+						direccionValida = verificarDirMem(EX_MEM[0]);
+						if(direccionValida){//si diera false, sería bueno agregar un manejo de excepcion
+							//si fuera válida, hay que verificar que haya un hit de memoria en cache.
+							//si diera fallo, hay que traer el bloque desde memoria si estuviera se toma directo de la cache
+							bloqueMem = calcularBloqueMemoria(EX_MEM[0]);
+							bloqueCache = calcularBloqueCache(EX_MEM[0]);
+							if(!hitMemoria(EX_MEM[0])){
+								//si hubiera fallo de memoria y el bloque en cache correspondiente está modificado,
+								//primero hay que guardarlo a memoria. para esto primero calculamos el bloque en memoria
+								//del dato que se quiere cargar. es aqui cuando se usa la estrategia WRITE ALLOCATE
+								if(cache[bloqueCache].getEtiqueta() == bloqueMem && cache[bloqueCache].getEtiqueta() == 'm'){
+									cacheStore(bloqueCache);
+								}
+								//en este punto se hace se carga la cache, pues no hubo hit de memoria
+								//y si el bloque estaba modificado ya se guardó antes a memoria
+								//es aqui cuando se usa la estrategia de WRITE BACK
+								cacheLoad(EX_MEM[0]);
+							}
+							//en este punto hubo hit de memoria, por lo que se carga el dato desde la cache
+							int indice = ((EX_MEM[0]+768) / 16 ) % 4;
+							MEM_WB[0] = cache[bloqueCache].getBloque()[indice];
+							MEM_WB[1] = EX_MEM[1];			//
+							MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion */			
+						}//fin de if direccionValida
 					break;
+					
 					case SW:
+						/*codigo viejo, sin implementacion de cache
 						dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
 						MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
 						MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion
+						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion*/
+						
+						//nuevamente, lo primero es verificar que la referencia a memoria sea valida
+						direccionValida = verificarDirMem(EX_MEM[0]);
+						if(direccionValida){
+							//si fuera valida, se verifica si el bloque de memoria está en cache
+							
+						}
 					break;
+					
 					default:
 						MEM_WB[0] = EX_MEM[0];
 						MEM_WB[1] = EX_MEM[1];
@@ -482,7 +535,7 @@ public class MIPSimulator {
 			System.out.println("R" + i + ": " + R[i].get() + " ");
 		}
 		System.out.println("\n+++++CONTENIDO EN MEMORIA+++++");
-		for(int i = 0; i < 200; i+=10){
+		for(int i = 0; i < dataMem.length; i+=10){
 			for(int j = 0; j < 10; j++){
 				System.out.print(dataMem[i+j] + " ");
 			}
@@ -510,7 +563,7 @@ public class MIPSimulator {
 	public void printProgram(){
 		boolean termino = false;
 		System.out.println("+++++PROGRAMA A EJECUTAR+++++");
-		for(int i = 0; i < 400 && termino == false; i+=4){
+		for(int i = 0; i < instructionMem.length*4 && termino == false; i+=4){
 			for(int j = 0; j < 4; j++){
 				if(instructionMem[i+j] == -1){
 					termino = true;
@@ -544,7 +597,7 @@ public class MIPSimulator {
 		M.start();
 		WB.start();
 		
-		while(etapasVivas() == true){
+		while(algunaEtapaViva() == true){
 			try {
 				
 				// esperar que se ejecuten todos y entrar
@@ -569,16 +622,135 @@ public class MIPSimulator {
 		
 	}
 	
-	
-	private boolean etapasVivas(){
-		//mientras alguna viva el principal seguira
-		// ejecutandose
+	//CORREGIDO. Es una mala practica tener varios return
+	private boolean algunaEtapaViva(){
+		//mientras alguna viva el principal seguira ejecutandose
+		boolean algunaVive = false;
 		if(ifAlive || idAlive || exAlive || memAlive || wbAlive){
-			return true;
+			algunaVive = true;
 		}
-		return false;
+		return algunaVive;
 	}
-}
 	
+	//calcula el bloque de memoria en el que se encuentra una direccion de memoria específica,
+	//ej: la direccion de memoria 0003 está en el bloque 000 de memoria, pues 3 / 16 = 0
+	//	  la direccion de memoria 0017 está en el bloque 001 de memoria, pues 17/ 16 = 1
+	public int calcularBloqueMemoria(int dirMemoria){
+		int posBloqueMem = (dirMemoria+768) / 16;
+		return posBloqueMem;
+	}
 	
+	//calcula el bloque de cache donde se debe almacenar un bloque de memoria específico,
+	//usando la estrategia de MAPEO DIRECTO
+	//recibe: la direccion de memoria, a la cual se le calculará su bloque de memoria
+	//ej: la direccion 3324 está en la direccion [831] del vector de memoria de datos,
+	//    la direccion de meroria [831]  está el bloque de memoria 255 y esta en el bloque de cache 7, pues 255 mod 8 = 1
+	public int calcularBloqueCache(int dirMem){
+		int bloqueMem = calcularBloqueMemoria(dirMem);
+		int posBloqueCache = 0;
+		posBloqueCache = bloqueMem % 8;
+		return posBloqueCache;
+	}
 	
+	//la memoria total es de 4096 enteros, 768 para instrucciones y 3328 para datos
+	//como cada entero en la memoria de datos es de 4 bytes hay que hacer el calculo para accesar a la memoria de datos
+	//así las direcciones referenciables son de 768 a 3324, siendo 768 v[0], 772 v[1], ... 3324 v[831]
+	//debe verificarse que las direcciones de memoria sean ser multiplos de 4 y que esten entre 768 y 3324
+	//retorna true si la direccion es valida, de lo contrario devuelve false
+	public boolean verificarDirMem(int dir){
+		boolean valida=false;
+		//primero verifica si la direccion es valida
+		if((dir>767 && dir<3325) && (dir % 4 == 0 )){
+			valida = true;
+		}
+		return valida;
+	}
+	
+	//NO confundir con instruccion LOAD
+	//guarda un bloque en cache, traído desde memoria
+	//recibe la posicion de memoria en la cual esta el dato que se quiere cargar
+	public void cacheLoad(int dirMemoria){
+		int bloqueMem = calcularBloqueMemoria(dirMemoria);
+		int bloqueCache = calcularBloqueCache(bloqueMem);
+		for(int i=0; i<4; ++i){//4 porque cada bloque contiene 16 enteros
+			cache[bloqueCache].setBloquePos(i, instructionMem[(bloqueMem*4)+i]);
+		}
+		cache[bloqueCache].setEtiqueta(bloqueMem);
+	}//fin del metodo cacheLoad
+	
+	//NO confundir con instruccion STORE
+	//guarda en memoria un bloque que está en la cache de datos
+	//recibe el numero de bloque de de cache que se quiere guardar (que basta para saber el bloque en memoria)
+	public void cacheStore(int numBloqueCache){
+		int dirMem = cache[numBloqueCache].getEtiqueta()*4 - 192; //direccion a partir de la que hay que guardar
+		for(int i=0; i<4; ++i){//4 porque cada bloque contiene 4 enteros
+			instructionMem[dirMem+i] = cache[numBloqueCache].getBloque()[i];
+		}
+	}//fin del metodo cacheStore
+	
+	//metodo para saber si un bloque de memoria está guardado en la cache
+	//recibe la direccion de memoria que se quiere accesar
+	//devuelve true si está en cache, de lo contrario devuleve false
+	public boolean hitMemoria(int dirMemoria){
+		boolean hit = false;
+		int bloqueMem = calcularBloqueMemoria(dirMemoria);
+		int bloqueCache = calcularBloqueCache(dirMemoria);
+		if(cache[bloqueCache].getEtiqueta() == bloqueMem){
+			hit = true;
+		}
+		return hit;
+	}//fin del metodo hitMemoria
+	
+	//imprime el estado de TODAS las variables del mips
+	void imprimirEstado(){
+		//imprime el estado de los registros
+		System.out.format("-----------------REGISTROS-----------------\n");
+		int count=0;
+		for(int i=0; i<8; ++i){
+			for(int j=0; j<4; ++j){
+				System.out.format("R%02d" + ": " + "%04d, ", count, R[i].get());
+				++count;
+			}
+			System.out.println();
+		}
+		
+		//imprime la memoria de instrucciones
+		System.out.println("\n--------MEMORIA DE INSTRUCCIONES--------");
+		count=0;
+		for(int i=0; i<48; ++i){
+			System.out.format("Bloque%02d: ", i);
+			for(int j=0; j<4; ++j){
+				System.out.format("%04d" + ", ", instructionMem[count]);
+				++count;
+			}
+			System.out.println();
+		}
+		
+		//imprime la memoria de datos
+		System.out.println("\n---------MEMORIA DE DATOS---------");
+		count=0;
+		for(int i=48; i<256; ++i){
+			System.out.format("Bloque%03d: ", i);
+			for(int j=0; j<4; ++j){
+				System.out.format("%04d" + ", ", dataMem[count]);
+				++count;
+			}
+			System.out.println();
+		}
+		
+		//imprime la memoria cache
+		System.out.println("\n---------MEMORIA DE CACHÉ---------");
+		count=0;
+		for(int i=0; i<8; ++i){
+			System.out.format("Bloque%02d: ", i);
+			for(int j=0; j<4; ++j){
+				System.out.format("%04d" + ", ", cache[i].getBloque()[j]);
+			}
+			System.out.println();
+		}
+		
+		//agregar middle stages, pc, IR, etc
+		
+	}//fin del metodo imprimirEstado
+	
+}//fin de la clase

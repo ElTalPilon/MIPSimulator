@@ -15,11 +15,9 @@ public class Main {
 		JFileChooser fileChooser = new JFileChooser();
 		if(fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION){
 			sim.loadFile(fileChooser.getSelectedFile());
-			sim.runProgram();
-			
-			
+			//sim.runProgram();
+			sim.imprimirEstado();
 			//sim.printState();
-			
 			
 		}
 	}
