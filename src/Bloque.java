@@ -6,12 +6,12 @@ public class Bloque {
 	private final int tamBloque = 4; //todo bloque tiene 4 palabras, que son 16 enteros
 	private int[] bloque; //cada bloque contiene 'tamBloque' enteros
 	private int etiqueta; //etiqueta del bloque de memoria que contiene
-	private char estado;//'v' para valido, 'm' para modificado
+	private char estado;//'c' para compartido, 'm' para modificado
 	
 	//constructor de la clase Bloque
 	public Bloque(){
 		etiqueta =-1; //como aun no contiene ningun bloque de memoria, se inicializa en -1
-		estado = 'v'; //por defecto el estado del bloque es valido
+		estado = 'c'; //por defecto el estado del bloque es valido
 		bloque = new int[tamBloque];
 		//inicializa el bloque con ceros
 		for(int i=0; i<tamBloque; ++i){
