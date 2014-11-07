@@ -633,10 +633,10 @@ public class MIPSimulator {
 	}
 	
 	//calcula el bloque de memoria en el que se encuentra una direccion de memoria específica,
-	//ej: la direccion de memoria 0003 está en el bloque 000 de memoria, pues 3 / 16 = 0
-	//	  la direccion de memoria 0017 está en el bloque 001 de memoria, pues 17/ 16 = 1
+	//ej: la direccion de memoria 0768 está en el bloque 48 de memoria, pues 768 / 16 = 48
+	//	  la direccion de memoria 4092 está en el bloque 256 de memoria, pues 4092/16 = 255
 	public int calcularBloqueMemoria(int dirMemoria){
-		int posBloqueMem = (dirMemoria+768) / 16;
+		int posBloqueMem = dirMemoria / 16;
 		return posBloqueMem;
 	}
 	
@@ -647,8 +647,7 @@ public class MIPSimulator {
 	//    la direccion de meroria [831]  está el bloque de memoria 255 y esta en el bloque de cache 7, pues 255 mod 8 = 1
 	public int calcularBloqueCache(int dirMem){
 		int bloqueMem = calcularBloqueMemoria(dirMem);
-		int posBloqueCache = 0;
-		posBloqueCache = bloqueMem % 8;
+		int posBloqueCache = bloqueMem % 8;
 		return posBloqueCache;
 	}
 	
@@ -660,7 +659,7 @@ public class MIPSimulator {
 	public boolean verificarDirMem(int dir){
 		boolean valida=false;
 		//primero verifica si la direccion es valida
-		if((dir>767 && dir<3325) && (dir % 4 == 0 )){
+		if((dir>767 && dir<4093) && (dir % 4 == 0 )){
 			valida = true;
 		}
 		return valida;
@@ -749,7 +748,7 @@ public class MIPSimulator {
 			System.out.println();
 		}
 		
-		//agregar middle stages, pc, IR, etc
+		//agregar imprimir middle stages, pc, IR, etc
 		
 	}//fin del metodo imprimirEstado
 	
