@@ -29,8 +29,12 @@ public class Bloque {
 	}
 	
 	
-	public int[] getBloque(){
-		return bloque;
+	//public int[] getBloque(){
+	//	return bloque;
+	//}
+	
+	public int getValor(int indice){
+		return bloque[indice];
 	}
 	
 	//set de una posicion unica del bloque

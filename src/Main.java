@@ -16,8 +16,15 @@ public class Main {
 		if(fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION){
 			sim.loadFile(fileChooser.getSelectedFile());
 			//sim.runProgram();
+			
+			for(int i=0; i<2; ++i){
+				sim.fetch();
+				sim.decode();
+				sim.execute();
+				sim.memory();
+				sim.writeBack();
+			}
 			sim.imprimirEstado();
-			//sim.printState();
 			
 		}
 	}
