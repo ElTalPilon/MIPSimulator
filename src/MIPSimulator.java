@@ -32,10 +32,10 @@ public class MIPSimulator {
 	private int[] dataMem;        	// Memoria de datos
 	private Bloque[] cache;			//cache del mips, formada de 8 bloques de 16 enteros c/u
 	
-	private CyclicBarrier clock;  // Reloj del sistema
-	private int clockCycle;       // Ciclo actual de reloj
+	private static int clock;  // Reloj del sistema
+	
 	private int PC;               // Contador del programa / Puntero de instrucciones
-	private boolean runningID;
+	
 	
 	//en la ultima posicion se pasa el operation code
 	private int[] IR;
@@ -87,10 +87,9 @@ public class MIPSimulator {
 			cache[i] = new Bloque();
 		}
 		
-		clock = new CyclicBarrier(4); // El 4 no sé...
-		clockCycle = 0;
+		clock = 0;
 		PC = 0;
-		runningID = true;
+		
 		
 		IR = new int[4];
 		
@@ -114,12 +113,17 @@ public class MIPSimulator {
 		public void run(){
 			while(ifAlive == true){
 				
-				if(IR[0] == FIN){
-					ifAlive = false;
-				}
-				
+				// Obtiene la instruccion del verctor de
+				// de instrucciones
 				for(int i = 0; i < 4; ++i){
 					IR[i] = instructionMem[PC+i];
+				}
+				
+				
+				// Cuando IF termina, hace un await para actualizar
+				//  ademas se sale del ciclo
+				if(IR[0] == FIN){
+					ifAlive = false;
 				}
 				
 				// Guarda la instrucción a ejecutar en IR
@@ -127,7 +131,6 @@ public class MIPSimulator {
 				try {
 					semIf.acquire();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				for(int i = 0; i < 4; ++i){
@@ -146,13 +149,25 @@ public class MIPSimulator {
 					barrier.await();
 					barrier.await();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} catch (BrokenBarrierException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}//fin de while(alive)
+			
+			// Muere y actualiza la barrera para controlar
+			// el ciclo del reloj
+			while (wbAlive) {
+                try {
+                    barrier.await();
+                    barrier.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                	e.printStackTrace();
+                }
+            }
+			
 		}//fin de metodo run
 	};//fin de metodo IFstage
 	
@@ -171,23 +186,31 @@ public class MIPSimulator {
 				
 				//Si es la primera instruccion no hace nada
 				//y desbloquea la etapa hacia atras
+				// aunque no haga nada tiene que actualizar el barrier
+				// para que se actualice el ciclo del reloj
 				if(IF_ID[0] == -1){
 					semIf.release();
+					try {
+						barrier.await();
+						barrier.await();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (BrokenBarrierException e) {
+						e.printStackTrace();
+					}
 					continue;
 					
 				}
-				//*****
-				System.out.println("ENtro ID");
+				
+				
 				try {
 					semId.acquire();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				try {
 					semR.acquire();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
@@ -241,6 +264,13 @@ public class MIPSimulator {
 					
 				break;
 				
+				case FIN:
+					ID_EX[0] = 0; 			// valor inmediato
+					ID_EX[1] = 0; 	// Origen
+					ID_EX[2] = 0;	// Destino
+					ID_EX[3] = IF_ID[0];			//operation code
+				break;
+				
 			  }//fin del switch
 				semId.release();
 				semIf.release();
@@ -252,15 +282,25 @@ public class MIPSimulator {
 					barrier.await();
 					barrier.await();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} catch (BrokenBarrierException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
 			}//fin del while alive
-			//runningID = false;	
+			
+			// Actualiza el ciclo del reloj cuando muere
+			while (wbAlive) {
+                try {
+                    barrier.await();
+                    barrier.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                	e.printStackTrace();
+                }
+            }
+			
 		}//fin del metodo run
 	};//fin del metodo IDstage
 	
@@ -280,15 +320,26 @@ public class MIPSimulator {
 				
 				//Si es la primera instruccion no hace nada
 				//y desbloquea la etapa hacia atras
+				// actualiza el ciclo del reloj
 				if(ID_EX[3] == -1){
-					semId.release();
+					semId.release();	
+					try {
+						barrier.await();
+						barrier.await();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (BrokenBarrierException e) {
+						e.printStackTrace();
+					}
+					
 					continue;
-				}
+				} // fin if cuando esta comenzando las etapas
 				
+				// Si Mem Stage lo desbloqueo ejecuta las operaciones
+				// para guardar resultados en la ALU
 				try {
 					semEx.acquire();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				switch(ID_EX[3]){
@@ -327,23 +378,41 @@ public class MIPSimulator {
 						EX_MEM[1] = ID_EX[1];			//Destino
 						EX_MEM[2] = ID_EX[3]; //codigo de operacion
 					break;
+					case FIN:
+						EX_MEM[0] = 0;	//Resultado de memoria del ALU
+						EX_MEM[1] = 0;			//Destino
+						EX_MEM[2] = ID_EX[3]; //codigo de operacion
+					break;
 				}//fin del switch
 				semEx.release();
 				semId.release();
-				
+				//***** PRUEBA
+				System.out.println("ENTRO EX_MEM: " + EX_MEM[0] +
+						EX_MEM[1] + EX_MEM[2] );
 				try {
 					barrier.await();
 					barrier.await();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} catch (BrokenBarrierException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
-				}//fin del while alive
-			}//fin del metodo run
+			}//fin del while alive
+			
+			// Muere y actualiza el reloj
+			while (wbAlive) {
+                try {
+                    barrier.await();
+                    barrier.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                	e.printStackTrace();
+                }
+            }
+			
+		}//fin del metodo run
 	};//fin del metodo EXstage
 	
 	//En esta etapa se escribe en MEM_WB
@@ -354,20 +423,30 @@ public class MIPSimulator {
 			
 			while(memAlive == true){
 				
+				// Si el codigo de operacion es 63
+				// la etapa tiene que termiar-morir
 				if(EX_MEM[2] == FIN){
 					memAlive = false;
 				}
 				
 				//Si es la primera instruccion no hace nada
+				// libera a EX y actualiza el reloj
 				if(EX_MEM[2] == -1){
 					semEx.release();
+					try {
+						barrier.await();
+						barrier.await();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (BrokenBarrierException e) {
+						e.printStackTrace();
+					}
 					continue;
 				}
 				
 				try {
 					semMem.acquire();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
@@ -441,6 +520,8 @@ public class MIPSimulator {
 						}
 					break;
 					
+					// aqui se maneja el caso de que sea otra operacion
+					// resuelta en EX o sea codigo de operacion FIN
 					default:
 						MEM_WB[0] = EX_MEM[0];
 						MEM_WB[1] = EX_MEM[1];
@@ -450,19 +531,34 @@ public class MIPSimulator {
 				semMem.release();
 				semEx.release();
 				
+				//*****PRUEBA
+				System.out.println("ENTRO MEM_WB: " + MEM_WB[0] +
+						MEM_WB[1] + MEM_WB[2] );
+				
 				try {
 					barrier.await();
 					barrier.await();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} catch (BrokenBarrierException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
 				
-			}//fin del while		
+			}//fin del while
+			
+			// Termina y actualiza el reloj
+			while (wbAlive) {
+                try {
+                    barrier.await();
+                    barrier.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                	e.printStackTrace();
+                }
+            }
+			
 		}//fin del metodo run
 	};//fin del metodo MEMstage
 	
@@ -477,8 +573,18 @@ public class MIPSimulator {
 				}
 				
 				//Si es la primera instruccion no hace nada
+				// libera registros y Mem Stage y actualiza el reloj
 				if(EX_MEM[2] == -1){
 					semMem.release();
+					semR.release();
+					try {
+						barrier.await();
+						barrier.await();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (BrokenBarrierException e) {
+						e.printStackTrace();
+					}
 					continue;
 				}
 				
@@ -510,10 +616,8 @@ public class MIPSimulator {
 					barrier.await();
 					barrier.await();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} catch (BrokenBarrierException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
@@ -607,15 +711,20 @@ public class MIPSimulator {
 				iniciarSemaforos();
 				
 				// bloquea los registros
-				semR.acquire();
+				try{// bloquea los registros
+					semR.acquire();
+	            } catch (InterruptedException e) {
+	                 e.printStackTrace();
+	            }
+
+			    clock++;
+			    // TODO: FALTA IMPRIMIR EL RELOJ
 				barrier.await();
 				//printState();
 				
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (BrokenBarrierException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
