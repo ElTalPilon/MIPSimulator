@@ -33,8 +33,8 @@ public class MIPSimulator {
 	private Bloque[] cache;			//cache del mips, formada de 8 bloques de 16 enteros c/u
 	
 	private static int clock;  // Reloj del sistema
-	
 	private int PC;               // Contador del programa / Puntero de instrucciones
+	int quantum;  // El quatum para implementar el round round robin
 	
 	
 	//en la ultima posicion se pasa el operation code
@@ -64,7 +64,9 @@ public class MIPSimulator {
 	private boolean wbAlive;
 	
 	//Constructor de la clase
-	public MIPSimulator(){
+	public MIPSimulator(int quantum){
+		this.quantum = quantum;
+		
 		//se inicializan los registros
 		R = new int[32];
 		for(int i=0; i<32; ++i){
@@ -574,7 +576,7 @@ public class MIPSimulator {
 				
 				//Si es la primera instruccion no hace nada
 				// libera registros y Mem Stage y actualiza el reloj
-				if(EX_MEM[2] == -1){
+				if(MEM_WB[2] == -1){
 					semMem.release();
 					semR.release();
 					try {
@@ -621,7 +623,20 @@ public class MIPSimulator {
 					e.printStackTrace();
 				}
 				
-			}// fin del while		
+			}// fin del while	
+			
+			
+			// Muere y aumenta el ciclo del reloj
+			try {
+				barrier.await();
+				barrier.await();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} catch (BrokenBarrierException e) {
+				e.printStackTrace();
+			}
+			
+			
 		}//fin del metodo run
 	};//fin del metodo WBstage
 	
@@ -632,6 +647,7 @@ public class MIPSimulator {
 	public void loadFile(File program){
 		try{
 			// Guarda las instrucciones del archivo en la memoria
+			// TODO: tiene que cargar más de un hilo
 			Scanner scanner = new Scanner(program);
 			for(int i = 0; i < instructionMem.length; i++){
 				if(scanner.hasNext()){
@@ -718,7 +734,8 @@ public class MIPSimulator {
 	            }
 
 			    clock++;
-			    // TODO: FALTA IMPRIMIR EL RELOJ
+			    // TODO: AQUI VA DONDE COMPARA CUANTOS CLOCKS LLEVA EL HILO CON EL QUAUNTUM Y LLAMA AL CAMBIO DE CONTEXTO
+			    
 				barrier.await();
 				//printState();
 				
@@ -729,10 +746,10 @@ public class MIPSimulator {
 			}
 		}
 		//printState();
-		
+		System.out.println("--- Ciclos de reloj: " + clock + " ---");
 	}
 	
-	//CORREGIDO. Es una mala practica tener varios return
+	
 	private boolean algunaEtapaViva(){
 		//mientras alguna viva el principal seguira ejecutandose
 		boolean algunaVive = false;
