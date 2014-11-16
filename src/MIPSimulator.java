@@ -648,14 +648,28 @@ public class MIPSimulator {
 		try{
 			// Guarda las instrucciones del archivo en la memoria
 			// TODO: tiene que cargar más de un hilo
+			
+			int primerCampoVacio = 0;
+			while(instructionMem[primerCampoVacio] != -1){
+				primerCampoVacio++;
+			}
+			
 			Scanner scanner = new Scanner(program);
-			for(int i = 0; i < instructionMem.length; i++){
+			
+			for(int i = primerCampoVacio; i < instructionMem.length; i++){
 				if(scanner.hasNext()){
 					instructionMem[i] = scanner.nextInt();
 				}else{
 					instructionMem[i] = -1;
 				}
 			}
+			if(scanner.hasNext()){
+				System.out.println("Error: La memoria es insuficiente para guardar ese hilo");
+				for(int i = primerCampoVacio; i < instructionMem.length; i++){
+					instructionMem[i] = -1;
+				}
+			}
+			
 			scanner.close();
 		}catch(FileNotFoundException e){
 			System.err.println("Error abriendo el archivo del programa.");

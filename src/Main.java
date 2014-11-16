@@ -52,8 +52,8 @@ public class Main {
 					sim.execute();
 					sim.memory();
 					sim.writeBack();
-				}
-				sim.imprimirEstado(); */
+				}*/
+				sim.imprimirEstado();
 				
 			}
 			int respuestaCargar = JOptionPane.showConfirmDialog(null, "Desea cargar mas hilos?");
