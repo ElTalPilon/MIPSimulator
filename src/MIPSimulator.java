@@ -75,7 +75,7 @@ public class MIPSimulator {
 		//se inicializa la memoria de instrucciones
 		instructionMem = new int[tamMemInstrucciones];
 		for(int i=0; i<tamMemInstrucciones; ++i){
-			instructionMem[i] = 0;
+			instructionMem[i] = -1;
 		}
 		//se inicializa la memoria de datos
 		dataMem = new int[tamMemDatos];
@@ -659,8 +659,6 @@ public class MIPSimulator {
 			for(int i = primerCampoVacio; i < instructionMem.length; i++){
 				if(scanner.hasNext()){
 					instructionMem[i] = scanner.nextInt();
-				}else{
-					instructionMem[i] = -1;
 				}
 			}
 			if(scanner.hasNext()){
