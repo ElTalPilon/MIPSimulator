@@ -644,32 +644,25 @@ public class MIPSimulator {
 	};//fin del metodo WBstage
 	
 	/**
-	 * Ejecuta el programa especificado.
+	 * Guarda las instrucciones del archivo especificado 
+	 * en la memoria de instrucciones.
 	 * @param program - Archivo .txt con lenguaje máquina (para MIPS) en decimal. 
 	 */
 	public boolean loadFile(File program){
+		int pos = primerCampoVacio;
 		boolean sePudo = false;
 		try{
-			// Guarda las instrucciones del archivo en la memoria
-			// TODO: tiene que cargar más de un hilo
-			
-			int pos = primerCampoVacio;
-			
 			Scanner scanner = new Scanner(program);
-			boolean hayCampo = true;
-			while(scanner.hasNext() && hayCampo){
-				if(pos < tamMemInstrucciones){
-					instructionMem[pos] = scanner.nextInt();
-					pos++;
-				}
-				else{
-					hayCampo = false;
-				}
+			while(scanner.hasNext() && pos < tamMemInstrucciones/4){
+				instructionMem[pos] = scanner.nextInt();
+				pos++;
 			}
 			
+			// Se fija si el hilo cupo en la memoria
 			if(scanner.hasNext()){
+				// De no ser así, borra lo que haya escrito
 				for(int i = primerCampoVacio; i < tamMemInstrucciones; i++){
-					instructionMem[i] = -1;
+					instructionMem[i] = 1;
 				}
 			}
 			else{
