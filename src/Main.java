@@ -1,4 +1,3 @@
-import java.util.Scanner;
 
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
@@ -53,7 +52,7 @@ public class Main {
 					sim.memory();
 					sim.writeBack();
 				}*/
-				sim.imprimirEstado();
+				//sim.imprimirEstado();
 				
 			}
 			int respuestaCargar = JOptionPane.showConfirmDialog(null, "Desea cargar mas hilos?");
@@ -65,6 +64,8 @@ public class Main {
 			}
 			
 		}while(!terminoCargarHilos);
+		sim.runProgram();
+		
 		//***Prueba
 		//return;
 		//System.out.println("Entro aca");

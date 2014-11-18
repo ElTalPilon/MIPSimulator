@@ -4,8 +4,9 @@ import java.util.Scanner;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Semaphore;
-//import java.util.concurrent.locks.Lock;
-//import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 
 /**
  * Clase que simula un procesador de 1 núcleo MIPS  
@@ -28,13 +29,14 @@ public class MIPSimulator {
 	
 	private int linkRegister;
 	private int[] R;		  		// Registros del procesador
+	private int [] rUsados; 		//Registros que estan en uso para evitar conflicto de datos
 	private int[] instructionMem;	// Memoria de instrucciones
 	private int[] dataMem;        	// Memoria de datos
 	private Bloque[] cache;			//cache del mips, formada de 8 bloques de 16 enteros c/u
 	
-	private static int clock;  // Reloj del sistema
+	private static int clock;  		// Reloj del sistema
 	private int PC;               // Contador del programa / Puntero de instrucciones
-	int quantum;  // El quatum para implementar el round round robin
+	int quantum;  				 // El quatum para implementar el round round robin
 	
 	
 	//en la ultima posicion se pasa el operation code
@@ -44,7 +46,7 @@ public class MIPSimulator {
 	private int[] EX_MEM = {-1,-1, -1};
 	private int[] MEM_WB = {-1,-1, -1};
 	
-	private int opCode = -1;
+	
 	
 	//semaforos por cada etapa
 	private static Semaphore semIf = new Semaphore(1);
@@ -63,14 +65,18 @@ public class MIPSimulator {
 	private boolean memAlive;
 	private boolean wbAlive;
 	
+	private boolean hayConflicto = false; // indica a IF que hay conflicto de datos
+	
 	//Constructor de la clase
 	public MIPSimulator(int quantum){
 		this.quantum = quantum;
 		
 		//se inicializan los registros
 		R = new int[32];
+		rUsados = new int[32];
 		for(int i=0; i<32; ++i){
 			R[i] = 0;
+			rUsados[i] = 0;
 		}
 		//se inicializa la memoria de instrucciones
 		instructionMem = new int[tamMemInstrucciones];
@@ -115,6 +121,10 @@ public class MIPSimulator {
 		public void run(){
 			while(ifAlive == true){
 				
+				
+				
+				
+				
 				// Obtiene la instruccion del verctor de
 				// de instrucciones
 				for(int i = 0; i < 4; ++i){
@@ -128,13 +138,30 @@ public class MIPSimulator {
 					ifAlive = false;
 				}
 				
-				// Guarda la instrucción a ejecutar en IR
 				// hasta que ID este desocupado se ejecuta
 				try {
 					semIf.acquire();
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
+				
+				// Si hay conflicto IF no hace nada pero se actualiza el reloj
+				// no va a pasar una nueva instruccion hasta que termine el conflicto
+				if(hayConflicto){
+					semIf.release(1);
+					
+					try {
+						barrier.await();
+						barrier.await();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (BrokenBarrierException e) {
+						e.printStackTrace();
+					}
+					continue;
+				}
+				
+				// Guarda la instrucción a ejecutar en el registro intermedio
 				for(int i = 0; i < 4; ++i){
 					IF_ID[i] = IR[i];
 				}
@@ -160,14 +187,16 @@ public class MIPSimulator {
 			// Muere y actualiza la barrera para controlar
 			// el ciclo del reloj
 			while (wbAlive) {
-                try {
-                    barrier.await();
-                    barrier.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (BrokenBarrierException e) {
-                	e.printStackTrace();
-                }
+				try {
+				      barrier.await(5,TimeUnit.SECONDS);
+					  barrier.await(5,TimeUnit.SECONDS);
+				 } catch (InterruptedException e) {
+						continue;
+				} catch (BrokenBarrierException e) {
+						continue;
+				} catch (TimeoutException e) {
+					continue;
+				}
             }
 			
 		}//fin de metodo run
@@ -216,44 +245,237 @@ public class MIPSimulator {
 					e.printStackTrace();
 				}
 				
+				/***********************************************
+				 *  Codigo para el manejo de conflicto de datos
+				 *  Si el registro que se requiere como operando aun no ha sido escrito
+				 *  por writeBack  ID se queda esperando hasta que WB escriba en el registro
+				 *  destino
+				 * ********************************************
+				 */
+				//if()if(hayConflicto == false){
+					
+					switch(IF_ID[0]){//contiene el código de instruccion
+					case DADDI:
+						if(rUsados[IF_ID[2]] == 1 ){
+							ID_EX[0] = -1; 			// RY
+							ID_EX[1] = -1;         // Destino
+							ID_EX[2] = -1;         // n
+							ID_EX[3] = -1;			//operation code
+							
+							hayConflicto = true;
+							semIf.release();
+							//actualiza el reloj y se sale
+							try {
+								barrier.await();
+								barrier.await();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							} catch (BrokenBarrierException e) {
+								e.printStackTrace();
+							}
+							continue;	
+						} // fin if
+						
+					break;
+					case DADD:
+						if( (rUsados[IF_ID[1]] == 1) || (rUsados[IF_ID[2]] == 1) ){
+							ID_EX[0] = -1; // Reg Operando1
+							ID_EX[1] = -1; // Reg Operando2
+							ID_EX[2] = -1;          // Reg Destino
+							ID_EX[3] = -1;			//operation code
+							
+							hayConflicto = true;
+							semIf.release();
+							//actualiza el reloj y se sale
+							try {
+								barrier.await();
+								barrier.await();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							} catch (BrokenBarrierException e) {
+								e.printStackTrace();
+							}
+							continue;	
+						} // fin if	
+					break;
+					case DSUB:
+						if((rUsados[IF_ID[1]] == 1) || (rUsados[IF_ID[2]] == 1)){
+							ID_EX[0] = -1; // Reg Operando1
+							ID_EX[1] = -1; // Reg Operando2
+							ID_EX[2] = -1;          // Reg Destino
+							ID_EX[3] = -1;			//operation code
+							
+							hayConflicto = true;
+							semIf.release();
+							//actualiza el reloj y se sale
+							try {
+								barrier.await();
+								barrier.await();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							} catch (BrokenBarrierException e) {
+								e.printStackTrace();
+							}
+							continue;	
+						} // Fin if
+						
+						 
+					break;
+					case DMUL:
+						if( (rUsados[IF_ID[1]] == 1) || (rUsados[IF_ID[2]] == 1) ){
+							ID_EX[0] = -1; // Reg Operando1
+							ID_EX[1] = -1; // Reg Operando2
+							ID_EX[2] = -1;          // Reg destino
+							ID_EX[3] = -1;			//operation code
+							
+							hayConflicto = true;
+							semIf.release();
+							//actualiza el reloj y se sale
+							try {
+								barrier.await();
+								barrier.await();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							} catch (BrokenBarrierException e) {
+								e.printStackTrace();
+							}
+							continue;	
+						}//fin if
+						
+					break;
+					case DDIV:
+						if( (rUsados[IF_ID[1]] == 1) || (rUsados[IF_ID[2]] == 1) ){
+							ID_EX[0] = -1;			// Reg Operando1
+							ID_EX[1] = -1;			// Reg Operando2
+							ID_EX[2] = -1;			// Reg Destino
+							ID_EX[3] = -1;			//operation code
+							
+							hayConflicto = true;
+							semIf.release();
+							//actualiza el reloj y se sale
+							try {
+								barrier.await();
+								barrier.await();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							} catch (BrokenBarrierException e) {
+								e.printStackTrace();
+							}
+							continue;	
+						}// fin if
+						
+					break;
+					case LW:
+						if( (rUsados[IF_ID[2]] == 1) || (rUsados[IF_ID[2]] == 1)){
+							ID_EX[0] = -1; 			// valor inmediato
+							ID_EX[1] = -1;  		// Origen
+							ID_EX[2] = -1;          	// Destino
+							ID_EX[3] = -1;			//operation code
+							
+							hayConflicto = true;
+							semIf.release();
+							//actualiza el reloj y se sale
+							try {
+								barrier.await();
+								barrier.await();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							} catch (BrokenBarrierException e) {
+								e.printStackTrace();
+							}
+							continue;	
+						} // fin if
+						
+					break;
+					case SW:
+						if((rUsados[IF_ID[2]] == 1)  || (rUsados[IF_ID[1]] == 1) ){
+							ID_EX[0] = -1; 			// valor inmediato
+							ID_EX[1] = -1; 	// Origen
+							ID_EX[2] = -1;	// Destino
+							ID_EX[3] = -1;			//operation code
+							System.out.println("ENTRO ACA");
+							hayConflicto = true;
+							semIf.release();
+							//actualiza el reloj y se sale
+							try {
+								barrier.await();
+								barrier.await();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							} catch (BrokenBarrierException e) {
+								e.printStackTrace();
+							}
+							continue;	
+						} // fin if
+					break;
+					case LL:
+						
+					break;
+					case SC:
+						
+					break;
+					
+					case FIN:
+					break;
+					
+				  }//fin del switch
+					
+				//}
+				
+				/***********************************************
+				 *  Fin manejo de conflicto de datos
+				 * ********************************************
+				 */
+					
+				// si salio del switch quiere decir que no hay
+				// conflicto
+				hayConflicto = false;
 				switch(IF_ID[0]){//contiene el código de instruccion
 				case DADDI:
 					ID_EX[0] = R[IF_ID[1]]; // RY
-					ID_EX[1] = IF_ID[2];          // X
+					ID_EX[1] = IF_ID[2];          // Destino
 					ID_EX[2] = IF_ID[3];          // n
 					ID_EX[3] = IF_ID[0];			//operation code
+					rUsados[IF_ID[2]] = 1;  // guarda en la tabla que registro destino esta siendo usado
 				break;
 				case DADD:
 					ID_EX[0] = R[IF_ID[1]]; // Reg Operando1
 					ID_EX[1] = R[IF_ID[2]]; // Reg Operando2
 					ID_EX[2] = IF_ID[3];          // Reg Destino
 					ID_EX[3] = IF_ID[0];			//operation code
+					rUsados[IF_ID[3]] = 1; 
 				break;
 				case DSUB:
 					ID_EX[0] = R[IF_ID[1]]; // Reg Operando1
 					ID_EX[1] = R[IF_ID[2]]; // Reg Operando2
 					ID_EX[2] = IF_ID[3];          // Reg Destino
 					ID_EX[3] = IF_ID[0];			//operation code
+					rUsados[IF_ID[3]] = 1; 
 				break;
 				case DMUL:
 					ID_EX[0] = R[IF_ID[1]]; // Reg Operando1
 					ID_EX[1] = R[IF_ID[2]]; // Reg Operando2
-					ID_EX[2] = IF_ID[3];          // Reg Operando3
+					ID_EX[2] = IF_ID[3];          // Reg destino
 					ID_EX[3] = IF_ID[0];			//operation code
+					rUsados[IF_ID[3]] = 1; 
 				break;
 				case DDIV:
 					ID_EX[0] = R[IF_ID[1]];			// Reg Operando1
 					ID_EX[1] = R[IF_ID[2]];			// Reg Operando2
-					ID_EX[2] = IF_ID[3];			// Reg Operando3
+					ID_EX[2] = IF_ID[3];			// Reg Destino
 					ID_EX[3] = IF_ID[0];			//operation code
+					rUsados[IF_ID[3]] = 1; 
 				break;
 				case LW:
 					ID_EX[0] = IF_ID[3]; 			// valor inmediato
 					ID_EX[1] = R[IF_ID[1]];  		// Origen
 					ID_EX[2] = IF_ID[2];          	// Destino
 					ID_EX[3] = IF_ID[0];			//operation code
+					rUsados[IF_ID[2]] = 1; 
 				break;
 				case SW:
+					// No hay que ponerle registros usados por que se escribira en
+					// memoria
 					ID_EX[0] = IF_ID[3]; 			// valor inmediato
 					ID_EX[1] = R[IF_ID[2]]; 	// Origen
 					ID_EX[2] = R[IF_ID[1]];	// Destino
@@ -275,11 +497,15 @@ public class MIPSimulator {
 				
 			  }//fin del switch
 				semId.release();
+				// Avisa que no hay conflicto para que IF ya lea otra instruccion
+				// luego la desbloquea
+				hayConflicto = false;
 				semIf.release();
 				semR.release();
+				
 				//*****
-				System.out.println("ENTRO: ID_EX: " + ID_EX[0] +
-						ID_EX[1] + ID_EX[2] + ID_EX[3]);
+				System.out.println("ENTRO: ID_EX: " + ID_EX[3] +
+						ID_EX[2] + ID_EX[0] + ID_EX[1]);
 				try {
 					barrier.await();
 					barrier.await();
@@ -293,14 +519,16 @@ public class MIPSimulator {
 			
 			// Actualiza el ciclo del reloj cuando muere
 			while (wbAlive) {
-                try {
-                    barrier.await();
-                    barrier.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (BrokenBarrierException e) {
-                	e.printStackTrace();
-                }
+				try {
+				      barrier.await(5,TimeUnit.SECONDS);
+					  barrier.await(5,TimeUnit.SECONDS);
+				 } catch (InterruptedException e) {
+						continue;
+				} catch (BrokenBarrierException e) {
+						continue;
+				} catch (TimeoutException e) {
+					continue;
+				}
             }
 			
 		}//fin del metodo run
@@ -316,6 +544,8 @@ public class MIPSimulator {
 			
 			while(exAlive == true){
 				
+				
+				
 				if(ID_EX[3] == FIN){
 					exAlive = false;
 				}
@@ -325,6 +555,12 @@ public class MIPSimulator {
 				// actualiza el ciclo del reloj
 				if(ID_EX[3] == -1){
 					semId.release();	
+					
+					// Manda -1 a mem
+					EX_MEM[0] = -1;
+					EX_MEM[1] = -1;
+					EX_MEM[2] = -1;
+					
 					try {
 						barrier.await();
 						barrier.await();
@@ -344,6 +580,7 @@ public class MIPSimulator {
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
+				
 				switch(ID_EX[3]){
 					case DADDI:
 						EX_MEM[0] = ID_EX[0]+ID_EX[2];
@@ -389,8 +626,8 @@ public class MIPSimulator {
 				semEx.release();
 				semId.release();
 				//***** PRUEBA
-				System.out.println("ENTRO EX_MEM: " + EX_MEM[0] +
-						EX_MEM[1] + EX_MEM[2] );
+				System.out.println("ENTRO EX_MEM: " + EX_MEM[2] +
+						EX_MEM[1] + EX_MEM[0] );
 				try {
 					barrier.await();
 					barrier.await();
@@ -404,14 +641,15 @@ public class MIPSimulator {
 			
 			// Muere y actualiza el reloj
 			while (wbAlive) {
-                try {
-                    barrier.await();
-                    barrier.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (BrokenBarrierException e) {
-                	e.printStackTrace();
-                }
+				try {
+				      barrier.await(5,TimeUnit.SECONDS);
+					  barrier.await(5,TimeUnit.SECONDS);
+				 } catch (InterruptedException e) {
+						continue;
+				} catch (BrokenBarrierException e) {
+						continue;
+				} catch (TimeoutException e) {
+				}
             }
 			
 		}//fin del metodo run
@@ -425,6 +663,9 @@ public class MIPSimulator {
 			
 			while(memAlive == true){
 				
+				
+				
+				
 				// Si el codigo de operacion es 63
 				// la etapa tiene que termiar-morir
 				if(EX_MEM[2] == FIN){
@@ -433,8 +674,12 @@ public class MIPSimulator {
 				
 				//Si es la primera instruccion no hace nada
 				// libera a EX y actualiza el reloj
+				// En los registros intermedios con Mem pone un -1
 				if(EX_MEM[2] == -1){
 					semEx.release();
+					MEM_WB[0] = -1;
+					MEM_WB[1] = -1;
+					MEM_WB[2] = -1;
 					try {
 						barrier.await();
 						barrier.await();
@@ -455,73 +700,18 @@ public class MIPSimulator {
 				boolean direccionValida;
 				int bloqueMem, bloqueCache;
 				switch(EX_MEM[2]){
-					case LW:
-						/*codigo viejo, sin implementacion de cache
-						MEM_WB[0] = dataMem[EX_MEM[0]]; //
-						MEM_WB[1] = EX_MEM[1];			//
-						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion */
-						
-						//primero hay que verificar que la direccion que se tratará de leer sea valida
-						direccionValida = verificarDirMem(EX_MEM[0]);
-						if(direccionValida){//si diera false, sería bueno agregar un manejo de excepcion
-							//si fuera válida, hay que verificar que haya un hit de memoria en cache.
-							//si diera fallo, hay que traer el bloque desde memoria, si estuviera se toma directo de la cache
-							bloqueMem = calcularBloqueMemoria(EX_MEM[0]);
-							bloqueCache = calcularBloqueCache(EX_MEM[0]);
-							if(!hitMemoria(EX_MEM[0])){
-								//si hubiera fallo de memoria y el bloque en cache correspondiente está modificado,
-								//primero hay que guardarlo a memoria. para esto primero calculamos el bloque en memoria
-								//del dato que se quiere cargar. es aqui cuando se usa la estrategia WRITE ALLOCATE
-								if(cache[bloqueCache].getEtiqueta() == bloqueMem && cache[bloqueCache].getEtiqueta() == 'm'){
-									cacheStore(bloqueCache);
-								}
-								//en este punto se hace se carga la cache, pues no hubo hit de memoria
-								//y si el bloque estaba modificado ya se guardó antes a memoria
-								//es aqui cuando se usa la estrategia de WRITE BACK
-								cacheLoad(EX_MEM[0]);
-							}
-							//en este punto sí hubo hit de memoria, por lo que se carga el dato desde la cache
-							int indice = ((EX_MEM[0]+768) / 16 ) % 4;
-							MEM_WB[0] = cache[bloqueCache].getValor(indice);
-							MEM_WB[1] = EX_MEM[1];			//
-							MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion */			
-						}//fin de if direccionValida
+				case LW: 
+					MEM_WB[0] = dataMem[EX_MEM[0]]; //
+					MEM_WB[1] = EX_MEM[1];			//
+					MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion 
 					break;
-					
-					case SW:
-						/*codigo viejo, sin implementacion de cache
-						dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
-						MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
-						MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion*/
-						
-						//nuevamente, lo primero es verificar que la referencia a memoria sea valida
-						direccionValida = verificarDirMem(EX_MEM[0]);
-						if(direccionValida){
-							//si fuera valida, se verifica si el bloque de memoria está en cache
-								bloqueMem = calcularBloqueMemoria(EX_MEM[0]);
-								bloqueCache = calcularBloqueCache(EX_MEM[0]);
-								if(!hitMemoria(EX_MEM[0])){
-									//si no hay hit de memoria hay que cargar el bloque a cache, pero si en el bloque de cache
-									//donde vamos a escribir está modificado, primero hay que escribir el bloque actual a memoria:
-									if(cache[bloqueCache].getEtiqueta() == bloqueMem && cache[bloqueCache].getEtiqueta() == 'm'){
-										cacheStore(bloqueCache);
-									}
-									//si no estuviera modificado, entonces ya podemos escribir el bloque de cache a memoria
-									cacheLoad(EX_MEM[0]);
-								}
-								//con el bloque ya en cache, debemos escribir en la posicion correcta del bloque
-								int offset = (EX_MEM[0] / 4) % 4; //se calcula el desplazamiento en el bloque
-								cache[bloqueCache].setBloquePos(offset, EX_MEM[1]); //el valor a guardar esta en EX_MEM[1]
-								cache[bloqueCache].setEstado('m'); //el estado debe pasar a modificado
-								
-								//pasa los valores a MEM_WB
-								MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
-								MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-								MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion*/
-						}
+				case SW:
+					dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
+					MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
+					MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
+					MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion
 					break;
-					
+			
 					// aqui se maneja el caso de que sea otra operacion
 					// resuelta en EX o sea codigo de operacion FIN
 					default:
@@ -534,8 +724,8 @@ public class MIPSimulator {
 				semEx.release();
 				
 				//*****PRUEBA
-				System.out.println("ENTRO MEM_WB: " + MEM_WB[0] +
-						MEM_WB[1] + MEM_WB[2] );
+				System.out.println("ENTRO MEM_WB: " + MEM_WB[2] +
+						MEM_WB[1] + MEM_WB[0] );
 				
 				try {
 					barrier.await();
@@ -551,14 +741,16 @@ public class MIPSimulator {
 			
 			// Termina y actualiza el reloj
 			while (wbAlive) {
-                try {
-                    barrier.await();
-                    barrier.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (BrokenBarrierException e) {
-                	e.printStackTrace();
-                }
+				try {
+				      barrier.await(5,TimeUnit.SECONDS);
+					  barrier.await(5,TimeUnit.SECONDS);
+				 } catch (InterruptedException e) {
+						continue;
+				} catch (BrokenBarrierException e) {
+						continue;
+				} catch (TimeoutException e) {
+					continue;
+				}
             }
 			
 		}//fin del metodo run
@@ -570,8 +762,23 @@ public class MIPSimulator {
 			
 			while(wbAlive == true){
 				
+				
+				// cuando recibe un 63 de código de operacion no hace nada
+				// solo actualiza el ciclo del reloj y avisa a las etapas 
+				// que murio
 				if(MEM_WB[2] == FIN){
+					try {
+					      barrier.await(5,TimeUnit.SECONDS);
+						  barrier.await(5,TimeUnit.SECONDS);
+					 } catch (InterruptedException e) {
+							e.printStackTrace();
+					} catch (BrokenBarrierException e) {
+							e.printStackTrace();
+					} catch (TimeoutException e) {
+					}
 					wbAlive = false;
+					
+					continue;
 				}
 				
 				//Si es la primera instruccion no hace nada
@@ -583,9 +790,9 @@ public class MIPSimulator {
 						barrier.await();
 						barrier.await();
 					} catch (InterruptedException e) {
-						e.printStackTrace();
+						break;
 					} catch (BrokenBarrierException e) {
-						e.printStackTrace();
+						break;
 					}
 					continue;
 				}
@@ -593,48 +800,66 @@ public class MIPSimulator {
 				switch(MEM_WB[2]){
 					case DADDI:
 						R[MEM_WB[1]] = MEM_WB[0];
+						rUsados[MEM_WB[1]] = 0;  // una vez que escribe en el registro notifica que no habra conflicto
 					break;
 					case DADD:
 						R[MEM_WB[1]] = MEM_WB[0];
+						rUsados[MEM_WB[1]] = 0;  // una vez que escribe en el registro notifica que no habra conflicto
 					break;
 					case DSUB:
 						R[MEM_WB[1]] = MEM_WB[0];
+						rUsados[MEM_WB[1]] = 0;  // una vez que escribe en el registro notifica que no habra conflicto
 					break;
 					case DMUL:
 						R[MEM_WB[1]] = MEM_WB[0];
+						rUsados[MEM_WB[1]] = 0;  // una vez que escribe en el registro notifica que no habra conflicto
 					break;
 					case DDIV:
 						R[MEM_WB[1]] = MEM_WB[0];
+						rUsados[MEM_WB[1]] = 0;  // una vez que escribe en el registro notifica que no habra conflicto
 					break;
 					case LW:
 						R[MEM_WB[1]] = MEM_WB[0];
+						rUsados[MEM_WB[1]] = 0;  // una vez que escribe en el registro notifica que no habra conflicto
 					break;
 					//en RW no hace nada en la etapa de writeback
 				}//fin del switch
-				
+				 // imprimir registros usados para probar
+			    System.out.format("-----------------REGISTROS USADOS WB-----------------\n");
+				int count=0;
+				for(int i=0; i<8; ++i){
+					for(int j=0; j<4; ++j){
+						System.out.format("R%02d" + ": " + "%04d, ", count, rUsados[count]);
+
+						++count;
+					}
+					System.out.println();
+				}
 				semMem.release(1);
 				semR.release();
 				try {
 					barrier.await();
 					barrier.await();
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					break;
 				} catch (BrokenBarrierException e) {
-					e.printStackTrace();
+					break;
 				}
 				
 			}// fin del while	
 			
 			
 			// Muere y aumenta el ciclo del reloj
-			try {
-				barrier.await();
-				barrier.await();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+			/*try {
+			      barrier.await(5,TimeUnit.SECONDS);
+				  barrier.await(5,TimeUnit.SECONDS);
+			 } catch (InterruptedException e) {
+					e.printStackTrace();
 			} catch (BrokenBarrierException e) {
-				e.printStackTrace();
-			}
+					e.printStackTrace();
+			} catch (TimeoutException e) {
+			}*/
+			
 			
 			
 		}//fin del metodo run
@@ -675,19 +900,7 @@ public class MIPSimulator {
 		//printProgram();
 	}	
 		
-		/*System.out.print("\nPC: " + PC + "\n");
 		
-		System.out.print("IR: ");
-		for(int i=0; i<4; ++i){
-			System.out.print(IR[i] + ", ");
-		}
-		System.out.println();
-		
-		System.out.println("\nIF_ID: " + IF_ID[0] + ", " + IF_ID[1] + ", " + IF_ID[2] + ", " + IF_ID[3]);
-		System.out.println("ID_EX: " + ID_EX[0] + ", " + ID_EX[1] + ", " + ID_EX[2]);
-		System.out.println("EX_MEM: " + EX_MEM[0] + ", " + EX_MEM[1]);
-		System.out.println("MEM_WB: " + MEM_WB[0] + ", " + MEM_WB[1]);*/
-	
 	
 	/**
 	 * Despliega el contenido de la memoria de instrucciones,
@@ -734,7 +947,7 @@ public class MIPSimulator {
 			try {
 				
 				// esperar que se ejecuten todos y entrar
-				barrier.await();
+				barrier.await(5,TimeUnit.SECONDS);
 				//vuelve a iniciar los semaforos, es decir bloquea los intermedios
 				iniciarSemaforos();
 				
@@ -747,14 +960,19 @@ public class MIPSimulator {
 
 			    clock++;
 			    // TODO: AQUI VA DONDE COMPARA CUANTOS CLOCKS LLEVA EL HILO CON EL QUAUNTUM Y LLAMA AL CAMBIO DE CONTEXTO
+			    System.out.println("--- Ciclos de reloj: " + clock + " ---");
 			    
-				barrier.await();
+			    
+			    
+			    
+				barrier.await(5,TimeUnit.SECONDS);
 				//printState();
 				
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				break;
 			} catch (BrokenBarrierException e) {
-				e.printStackTrace();
+				break;
+			}catch (TimeoutException e) {
 			}
 		}
 		//printState();
