@@ -7,6 +7,8 @@ import java.util.concurrent.Semaphore;
 //import java.util.concurrent.locks.Lock;
 //import java.util.concurrent.locks.ReentrantLock;
 
+import javax.swing.JOptionPane;
+
 /**
  * Clase que simula un procesador de 1 núcleo MIPS  
  */
@@ -15,6 +17,7 @@ public class MIPSimulator {
 	private final int tamMemInstrucciones = 768;//768 / 4 = 192 instrucciones / 4 = 48 bloques
 	private final int tamMemDatos = 832; 		//se asume que cada entero es de 4 bytes
 	private final int numBloquesCache = 8;		//el cache tiene 8 bloques
+	private int primerCampoVacio = 0;     		//Desde donde se puede cargar el siguiente hilo
 	private final int DADDI = 8;
 	private final int DADD 	= 32;
 	private final int DSUB 	= 34;
@@ -75,7 +78,7 @@ public class MIPSimulator {
 		//se inicializa la memoria de instrucciones
 		instructionMem = new int[tamMemInstrucciones];
 		for(int i=0; i<tamMemInstrucciones; ++i){
-			instructionMem[i] = -1;
+			instructionMem[i] = 1;
 		}
 		//se inicializa la memoria de datos
 		dataMem = new int[tamMemDatos];
@@ -104,7 +107,7 @@ public class MIPSimulator {
 		memAlive = true;
 		wbAlive = true;
 	}
-	
+
 	/**
 	 * Instancia de runnable que se encargará de la etapa IF del pipeline.
 	 * En esta etapa se guarda en IR la instrucción a la que apunta PC y,
@@ -644,35 +647,40 @@ public class MIPSimulator {
 	 * Ejecuta el programa especificado.
 	 * @param program - Archivo .txt con lenguaje máquina (para MIPS) en decimal. 
 	 */
-	public void loadFile(File program){
+	public boolean loadFile(File program){
+		boolean sePudo = false;
 		try{
 			// Guarda las instrucciones del archivo en la memoria
 			// TODO: tiene que cargar más de un hilo
 			
-			int primerCampoVacio = 0;
-			while(instructionMem[primerCampoVacio] != -1){
-				primerCampoVacio++;
-			}
+			int pos = primerCampoVacio;
 			
 			Scanner scanner = new Scanner(program);
-			
-			for(int i = primerCampoVacio; i < instructionMem.length; i++){
-				if(scanner.hasNext()){
-					instructionMem[i] = scanner.nextInt();
+			boolean hayCampo = true;
+			while(scanner.hasNext() && hayCampo){
+				if(pos < tamMemInstrucciones){
+					instructionMem[pos] = scanner.nextInt();
+					pos++;
+				}
+				else{
+					hayCampo = false;
 				}
 			}
+			
 			if(scanner.hasNext()){
-				System.out.println("Error: La memoria es insuficiente para guardar ese hilo");
-				for(int i = primerCampoVacio; i < instructionMem.length; i++){
+				for(int i = primerCampoVacio; i < tamMemInstrucciones; i++){
 					instructionMem[i] = -1;
 				}
 			}
-			
+			else{
+				primerCampoVacio = pos;
+				sePudo = true;
+			}
 			scanner.close();
 		}catch(FileNotFoundException e){
 			System.err.println("Error abriendo el archivo del programa.");
 		}
-		//printProgram();
+		return sePudo;
 	}	
 		
 		/*System.out.print("\nPC: " + PC + "\n");

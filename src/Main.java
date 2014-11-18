@@ -1,5 +1,3 @@
-import java.util.Scanner;
-
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 
@@ -42,8 +40,9 @@ public class Main {
 		// el usuario podrá cargar tantos hilos como desee
 		do{
 			JFileChooser fileChooser = new JFileChooser();
+			boolean sePudo = true;
 			if(fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION){
-				sim.loadFile(fileChooser.getSelectedFile());
+				sePudo = sim.loadFile(fileChooser.getSelectedFile());
 				//sim.runProgram(); 
 				
 				/*for(int i=0; i<2; ++i){
@@ -54,16 +53,19 @@ public class Main {
 					sim.writeBack();
 				}*/
 				sim.imprimirEstado();
-				
 			}
-			int respuestaCargar = JOptionPane.showConfirmDialog(null, "Desea cargar mas hilos?");
-			if(respuestaCargar==JOptionPane.YES_OPTION){
-				JOptionPane.showMessageDialog(null, "Se cargará otro hilo.");
-			}else{
-				terminoCargarHilos = true;
-				JOptionPane.showMessageDialog(null, "NO se cargarán más hilos.");
+			if(!sePudo){
+				int respuestaCargar = JOptionPane.showConfirmDialog(null, "La memoria es insuficiente para ese hilo.\n¿Desea cargar otro?");
+				if(respuestaCargar==JOptionPane.NO_OPTION){
+					terminoCargarHilos = true;
+				}
 			}
-			
+			else{
+				int respuestaCargar = JOptionPane.showConfirmDialog(null, "Desea cargar otro hilo?");
+				if(respuestaCargar==JOptionPane.NO_OPTION){
+					terminoCargarHilos = true;
+				}
+			}
 		}while(!terminoCargarHilos);
 		//***Prueba
 		//return;
