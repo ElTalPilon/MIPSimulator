@@ -28,16 +28,18 @@ public class MIPSimulator {
 	private final int DDIV 	= 14;
 	private final int LW 	= 35;
 	private final int SW 	= 43;
-	private final int FIN 	= 63;
+	private final int BEQZ	= 4;
+	private final int BNEZ	= 5;
 	private final int LL 	= 50;
 	private final int SC	= 51;
-
+	private final int FIN 	= 63;
+	
 	private int linkRegister;
 	private int[] R;		  		// Registros del procesador
-	private int [] rUsados; 		//Registros que estan en uso para evitar conflicto de datos
+	private int [] rUsados; 		// Registros que estan en uso para evitar conflicto de datos
 	private int[] instructionMem;	// Memoria de instrucciones
 	private int[] dataMem;        	// Memoria de datos
-	private Bloque[] cache;			//cache del mips, formada de 8 bloques de 16 enteros c/u
+	private Bloque[] cache;			// cache del mips, formada de 8 bloques de 16 enteros c/u
 
 	private static int clock;	// Reloj del sistema
 	private int PC;				// Contador del programa / Puntero de instrucciones
@@ -1162,14 +1164,12 @@ public class MIPSimulator {
 		return posBloqueCache;
 	}
 
-	/**Metodo que verifica si la direccion de memoria es valida
+	/* Metodo que verifica si la direccion de memoria es valida
 	 * La memoria total es de 4096 enteros, 768 para instrucciones y 3328 para datos como cada entero 
 	 * en la memoria de datos es de 4 bytes hay que hacer el calculo para accesar a la memoria de 
 	 * datos así las direcciones referenciables son de 768 a 3324, siendo 768 v[0], 772 v[1], ... 3324 v[831] 
 	 * debe verificarse que las direcciones de memoria sean ser multiplos de 4 y que esten entre 768 y 3324 
 	 * retorna true si la direccion es valida, de lo contrario devuelve false
-	 * @param dir
-	 * @return
 	 */
 	public boolean verificarDirMem(int dir){
 		boolean valida=false;
@@ -1180,8 +1180,8 @@ public class MIPSimulator {
 		return valida;
 	}
 
-	/** No confundir con instruccion LOAD
-	 *  Guarda un bloque en cache, traído desde memoria recibe la 
+	/* No confundir con instrucción LOAD
+	 * Guarda un bloque en cache, traído desde memoria recibe la 
 	 * posicion de memoria en la cual esta el dato que se quiere cargar
 	 * @param dirMemoria
 	 */
@@ -1192,6 +1192,7 @@ public class MIPSimulator {
 			cache[bloqueCache].setBloquePos(i, dataMem[(bloqueMem-48)*4+i]);
 		}
 		cache[bloqueCache].setEtiqueta(bloqueMem);
+		cache[bloqueCache].setEstado('c');
 	}//fin del metodo cacheLoad
 
 	/** No confundir con instruccion STORE 
@@ -1259,7 +1260,9 @@ public class MIPSimulator {
 			}
 			System.out.println();
 		}
-
+		
+		System.out.println("\nLink Register: " + linkRegister);
+		
 		//imprime la memoria cache
 		System.out.println("\n----------MEMORIA CACHÉ---------");
 		count=0;
@@ -1295,8 +1298,7 @@ public class MIPSimulator {
 		}
 
 		//*****
-		System.out.println("ENTRO: IF_ID: " + IF_ID[0] +
-				IF_ID[1] + IF_ID[2] + IF_ID[3]);
+		//System.out.println("ENTRO: IF_ID: " + IF_ID[0] + IF_ID[1] + IF_ID[2] + IF_ID[3]);
 		// Aumenta el PC
 		PC += 4;
 		// Espera a que ID se desocupe con un lock o algo así		
@@ -1311,49 +1313,55 @@ public class MIPSimulator {
 			ID_EX[0] = R[IF_ID[1]]; 		// RY
 			ID_EX[1] = IF_ID[2];          	// X
 			ID_EX[2] = IF_ID[3];          	// n
-			ID_EX[3] = IF_ID[0];			//operation code
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
 		case DADD:
 			ID_EX[0] = R[IF_ID[1]]; 		// Reg Operando1
 			ID_EX[1] = R[IF_ID[2]]; 		// Reg Operando2
 			ID_EX[2] = IF_ID[3];          	// Reg Destino
-			ID_EX[3] = IF_ID[0];			//operation code
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
 		case DSUB:
 			ID_EX[0] = R[IF_ID[1]]; 		// Reg Operando1
 			ID_EX[1] = R[IF_ID[2]]; 		// Reg Operando2
 			ID_EX[2] = IF_ID[3];          	// Reg Destino
-			ID_EX[3] = IF_ID[0];			//operation code
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
 		case DMUL:
 			ID_EX[0] = R[IF_ID[1]]; 		// Reg Operando1
 			ID_EX[1] = R[IF_ID[2]]; 		// Reg Operando2
 			ID_EX[2] = IF_ID[3];          	// Reg Operando3
-			ID_EX[3] = IF_ID[0];			//operation code
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
 		case DDIV:
 			ID_EX[0] = R[IF_ID[1]];			// Reg Operando1
 			ID_EX[1] = R[IF_ID[2]];			// Reg Operando2
 			ID_EX[2] = IF_ID[3];			// Reg Operando3
-			ID_EX[3] = IF_ID[0];			//operation code
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
 		case LW:
 			ID_EX[0] = IF_ID[3]; 			// valor inmediato
-			ID_EX[1] = R[IF_ID[1]];  		// Origen
-			ID_EX[2] = IF_ID[2];          	// Destino
-			ID_EX[3] = IF_ID[0];			//operation code
+			ID_EX[1] = R[IF_ID[1]];  		// Reg Origen
+			ID_EX[2] = IF_ID[2];          	// Reg Destino
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
 		case SW:
 			ID_EX[0] = IF_ID[3]; 			// valor inmediato
-			ID_EX[1] = R[IF_ID[2]]; 		// Origen
-			ID_EX[2] = R[IF_ID[1]];			// Destino
-			ID_EX[3] = IF_ID[0];			//operation code
+			ID_EX[1] = R[IF_ID[2]]; 		// Reg Origen
+			ID_EX[2] = R[IF_ID[1]];			// Reg Destino
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
-		case LL:
-
+		case LL:	//hace lo mismo que LW
+			ID_EX[0] = IF_ID[3]; 			// valor inmediato
+			ID_EX[1] = R[IF_ID[1]];  		// Reg Origen
+			ID_EX[2] = IF_ID[2];          	// Reg Destino
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
-		case SC:
-
+		case SC:	//hace lo mismo que SW
+			ID_EX[0] = IF_ID[3]; 			// valor inmediato
+			ID_EX[1] = R[IF_ID[1]]; 		// Valor en Reg Origen
+			ID_EX[2] = IF_ID[2];			// Reg Destino
+			ID_EX[3] = IF_ID[0];			// operation code
 			break;
 
 		}//fin del switch
@@ -1391,12 +1399,22 @@ public class MIPSimulator {
 			break;
 		case LW:
 			EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
-			EX_MEM[1] = ID_EX[2];			//Destino
+			EX_MEM[1] = ID_EX[2];			//Reg Destino
 			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
 		case SW:
 			EX_MEM[0] = ID_EX[0]+ID_EX[2];	//Resultado de memoria del ALU
 			EX_MEM[1] = ID_EX[1];			//Destino
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
+			break;
+		case LL://hace lo mismo que LW
+			EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
+			EX_MEM[1] = ID_EX[2];			//Reg Destino
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
+			break;
+		case SC://hace lo mismo que SW
+			EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
+			EX_MEM[1] = ID_EX[2];			//Registro Destino
 			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
 		}//fin del switch
@@ -1408,9 +1426,9 @@ public class MIPSimulator {
 		switch(EX_MEM[2]){
 		case LW:
 			/*codigo viejo, sin implementacion de cache
-				MEM_WB[0] = dataMem[EX_MEM[0]]; //
-				MEM_WB[1] = EX_MEM[1];			//
-				MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion */
+			MEM_WB[0] = dataMem[EX_MEM[0]]; //lee el dato de Mem[ALU]
+			MEM_WB[1] = EX_MEM[1];			//reg destino
+			MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion */
 
 			//primero hay que verificar que la direccion que se tratará de leer sea valida
 			direccionValida = verificarDirMem(EX_MEM[0]);
@@ -1435,17 +1453,17 @@ public class MIPSimulator {
 				int indice = ((EX_MEM[0]+768) / 16 ) % 4;
 				MEM_WB[0] = cache[bloqueCache].getValor(indice);
 				//System.out.println(MEM_WB[0]);
-				MEM_WB[1] = EX_MEM[1];			//
-				MEM_WB[2] = EX_MEM[2]; 			//en MEM_WB[2] va el codigo de operacion			
+				MEM_WB[1] = EX_MEM[1];			//reg destino
+				MEM_WB[2] = EX_MEM[2]; 			//el codigo de operacion			
 			}//fin de if direccionValida
 			break;
 
 		case SW:
 			/*codigo viejo, sin implementacion de cache
-				dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
-				MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
-				MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-				MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion*/
+			dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
+			MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
+			MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
+			MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion*/
 
 			//nuevamente, lo primero es verificar que la referencia a memoria sea valida
 			direccionValida = verificarDirMem(EX_MEM[0]);
@@ -1456,7 +1474,7 @@ public class MIPSimulator {
 				if(!hitMemoria(EX_MEM[0])){
 					//si no hay hit de memoria hay que cargar el bloque a cache, pero si en el bloque de cache
 					//donde vamos a escribir está modificado, primero hay que escribir el bloque actual a memoria:
-					if(cache[bloqueCache].getEstado() == 'm'){
+					if(cache[bloqueCache].getEtiqueta() == bloqueMem && cache[bloqueCache].getEtiqueta() == 'm'){
 						cacheStore(bloqueCache);
 					}
 					//si no estuviera modificado, entonces ya podemos escribir el bloque de cache a memoria
@@ -1470,7 +1488,7 @@ public class MIPSimulator {
 				//pasa los valores a MEM_WB
 				MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
 				MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-				MEM_WB[2] = EX_MEM[2]; 			//en MEM_WB[2] va el codigo de operacion
+				MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion
 			}
 			break;
 
@@ -1492,20 +1510,21 @@ public class MIPSimulator {
 					//y si el bloque estaba modificado ya se guardó antes a memoria
 					//es aqui cuando se usa la estrategia de WRITE BACK
 					cacheLoad(EX_MEM[0]);
+
 				}
 				//en este punto sí hubo hit de memoria, por lo que se carga el dato desde la cache
-				int indice = ((EX_MEM[0]+768) / 16 ) % 4;
+				int indice = ((EX_MEM[0]+768) / 16 ) % 4; //es el desplazamiento que debe hacerse en el bloque
 				MEM_WB[0] = cache[bloqueCache].getValor(indice);
-				//System.out.println(MEM_WB[0]);
-				MEM_WB[1] = EX_MEM[1];			//
-				MEM_WB[2] = EX_MEM[2]; 			//en MEM_WB[2] va el codigo de operacion			
+				MEM_WB[1] = EX_MEM[1];		//reg destino
+				MEM_WB[2] = EX_MEM[0]; 		//direccion de memoria M[ALU]
 			}//fin de if direccionValida
-		break;
+			break;
 		case SC://igual a SW, solo que se hace solo si el register link es igual a la direccion de la memoria y pone 1 en Rx
-				//si no fueran iguales, entonces no pasa nada en memoria y pone un 0 en Rx
-			if(true){
-				direccionValida = verificarDirMem(EX_MEM[0]);
-				if(direccionValida){
+			//si no fueran iguales, entonces no realiza nada en memoria y pone un 0 en Rx
+
+			direccionValida = verificarDirMem(EX_MEM[0]);
+			if(direccionValida){
+				if(EX_MEM[0]==linkRegister){//si son iguales, no ha habido cambio de contexto
 					//si fuera valida, se verifica si el bloque de memoria está en cache
 					bloqueMem = calcularBloqueMemoria(EX_MEM[0]);
 					bloqueCache = calcularBloqueCache(EX_MEM[0]);
@@ -1520,19 +1539,18 @@ public class MIPSimulator {
 					}
 					//con el bloque ya en cache, debemos escribir en la posicion correcta del bloque
 					int offset = (EX_MEM[0] / 4) % 4; //se calcula el desplazamiento en el bloque
-					cache[bloqueCache].setBloquePos(offset, EX_MEM[1]); //el valor a guardar esta en EX_MEM[1]
+					cache[bloqueCache].setBloquePos(offset, R[EX_MEM[1]]); //el valor a guardar en el bloque está en el registro EX_MEM[1]
 					cache[bloqueCache].setEstado('m'); //cuando se escribe en cache el estado debe pasar a modificado
-
-					//pasa los valores a MEM_WB
-					MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
-					MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
-					MEM_WB[2] = EX_MEM[2]; 			//en MEM_WB[2] va el codigo de operacion
+					MEM_WB[2] = 1; //si el SC es exitoso, se guarda un 1 en el registro destino
 				}
+				else{
+					MEM_WB[2] = 0; //hubo cambio de contexto y el SC falló, por lo que pasa un 0
+				}
+				//pasa los valores a MEM_WB, sin importar si el SC falle o sea exitoso
+				MEM_WB[0] = EX_MEM[0];	//direccion de memoria M[ALU]
+				MEM_WB[1] = EX_MEM[1];	//registro destino
 			}
-			else{
-				
-			}
-		break;
+			break;
 		default:
 			MEM_WB[0] = EX_MEM[0];
 			MEM_WB[1] = EX_MEM[1];
@@ -1541,7 +1559,7 @@ public class MIPSimulator {
 	}//fin metodo memory
 
 	public void writeBack(){
-		switch(MEM_WB[2]){ //codigo de operacion en MEM_WB[2]
+		switch(IR[0]){ //codigo de operacion en IR[0]
 		case DADDI:
 			R[MEM_WB[1]] = MEM_WB[0];
 			break;
@@ -1560,6 +1578,18 @@ public class MIPSimulator {
 		case LW:
 			R[MEM_WB[1]] = MEM_WB[0];
 			break;
+		case LL:
+			linkRegister = MEM_WB[2];	//guarda en el LR la direccion de memoria
+			R[MEM_WB[1]] = MEM_WB[0];
+		break;
+		case SC:
+			if(MEM_WB[2] == 1){			//si el SC fue exitoso
+				R[MEM_WB[1]] = 1;
+			}
+			if(MEM_WB[2] == 0){			//si el SC no tuvo exito
+				R[MEM_WB[1]] = 0;
+			}
+		break;
 			//en RW no hace nada en la etapa de writeback
 		}//fin del switch
 	}//fin metodo writeBack

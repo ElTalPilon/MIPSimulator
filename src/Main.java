@@ -10,6 +10,27 @@ import javax.swing.JOptionPane;
  */
 public class Main {
 	public static void main(String[] args) {
+		/*
+		//roy. prueba los stages de forma asincrónica
+		MIPSimulator sim = new MIPSimulator(25);
+
+		JFileChooser fileChooser = new JFileChooser();
+		if(fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION){
+			sim.loadFile(fileChooser.getSelectedFile());
+			//sim.runProgram();
+			
+			for(int i=0; i<4; ++i){
+				sim.fetch();
+				sim.decode();
+				sim.execute();
+				sim.memory();
+				sim.writeBack();
+			}
+			sim.imprimirEstado();
+		}
+		*/
+		
+		//main de Alexis 
 		// prueba repo
 		int quantum = 0;
 		boolean quantumValido = false;
@@ -45,13 +66,13 @@ public class Main {
 				sePudo = sim.loadFile(fileChooser.getSelectedFile());
 				//sim.runProgram(); 
 				
-				/*for(int i=0; i<2; ++i){
+				for(int i=0; i<2; ++i){
 					sim.fetch();
 					sim.decode();
 					sim.execute();
 					sim.memory();
 					sim.writeBack();
-				}*/
+				}
 				//sim.imprimirEstado();
 			}
 			if(!sePudo){
@@ -72,5 +93,6 @@ public class Main {
 		//***Prueba
 		//return;
 		//System.out.println("Entro aca");
-	}
-}
+	
+	}//fin del metodo main
+}//fin de la clase Main
