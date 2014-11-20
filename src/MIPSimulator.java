@@ -588,6 +588,7 @@ public class MIPSimulator {
 		int operador_1; // Fuente
 		int operador_2; // Destino
 		int operador_3; // Codigo de operacion
+		int resultado; // guarda el resultado de ALU
 		@Override
 		public void run(){
 			// Mientras no se llegue a la instruccion 63 la etapa ejecutara lo que le corresponde
@@ -600,6 +601,9 @@ public class MIPSimulator {
 				operador_1 = ID_EX[1];
 				operador_2 = ID_EX[2];
 				operador_3 = ID_EX[3];
+				
+				// Le dice a ID que no esta ocupado los registros intermedios
+				semId.release();
 
 				/* Si el codigo de operacion es 63 debe morir cuando WB muera*/
 				if(operador_3 == FIN){
@@ -634,6 +638,32 @@ public class MIPSimulator {
 					continue;
 				} // fin if cuando esta comenzando las etapas
 
+				
+				// Realiza las operaciones
+				switch(operador_3){
+				case DADDI:
+					resultado = operador_0 + operador_2;
+					break;
+				case DADD:
+					resultado = operador_0 + operador_1;
+					break;
+				case DSUB:
+					resultado = operador_0 - operador_1;
+					break;
+				case DMUL:
+					resultado = operador_0 * operador_1;
+					break;
+				case DDIV:
+					resultado = operador_0 / operador_1;
+					break;
+				case LW:
+					resultado = operador_0 + operador_1;	//Resultado de memoria del ALU
+					break;
+				case SW:
+					resultado = operador_0 + operador_2;	//Resultado de memoria del ALU
+					break;
+				}//fin del switch
+				
 				/* Si Mem Stage lo desbloqueo pasa el resultado de las operaciones aritmeticas
 				 * y el registro destino o posicion de memoria a EX_MEM
 				 */
@@ -642,40 +672,41 @@ public class MIPSimulator {
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-
+				
+				// Escribe los resultados intermedios
 				switch(operador_3){
 				case DADDI:
-					EX_MEM[0] = operador_0 + operador_2;
+					EX_MEM[0] = resultado;
 					EX_MEM[1] = operador_1; //como escribe en registro, el campo de memoria va vacio
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
 				case DADD:
-					EX_MEM[0] = operador_0 + operador_1;
+					EX_MEM[0] = resultado;
 					EX_MEM[1] = operador_2;
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
 				case DSUB:
-					EX_MEM[0] = operador_0 - operador_1;
+					EX_MEM[0] = resultado;
 					EX_MEM[1] = operador_2;
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
 				case DMUL:
-					EX_MEM[0] = operador_0 * operador_1;
+					EX_MEM[0] = resultado;
 					EX_MEM[1] = operador_2;
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
 				case DDIV:
-					EX_MEM[0] = operador_0 / operador_1;
+					EX_MEM[0] = resultado;
 					EX_MEM[1] = operador_2;
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
 				case LW:
-					EX_MEM[0] = operador_0 + operador_1;	//Resultado de memoria del ALU
+					EX_MEM[0] = resultado;	//Resultado de memoria del ALU
 					EX_MEM[1] = operador_2;			//Destino
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
 				case SW:
-					EX_MEM[0] = operador_0 + operador_2;	//Resultado de memoria del ALU
+					EX_MEM[0] = resultado;	//Resultado de memoria del ALU
 					EX_MEM[1] = operador_1;			//Destino
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
@@ -685,10 +716,11 @@ public class MIPSimulator {
 					EX_MEM[2] = operador_3; //codigo de operacion
 					break;
 				}//fin del switch
+				
+				
 				semEx.release();
 
-				// Le dice a ID que no esta ocupado
-				semId.release();
+				
 				//***** PRUEBA
 				System.out.println("ENTRO EX_MEM: " + EX_MEM[2] +
 						EX_MEM[1] + EX_MEM[0] );
@@ -750,6 +782,9 @@ public class MIPSimulator {
 				operador_0 = EX_MEM[0];
 				operador_1 = EX_MEM[1];
 				operador_2 = EX_MEM[2];
+				
+				// Libera los registros intermedios EX_MEM
+				semEx.release();
 
 				// Si el codigo de operacion es 63
 				// la etapa tiene que termiar-morir
@@ -790,29 +825,143 @@ public class MIPSimulator {
 				boolean direccionValida;
 				int bloqueMem, bloqueCache;
 				// TODO: VOLVER A PONER LO DE CACHE
-				switch(EX_MEM[2]){
-				case LW: 
-					MEM_WB[0] = dataMem[operador_0]; //
-					MEM_WB[1] = operador_1;			//
-					MEM_WB[2] = operador_2; 			//codigo de operacion 
-					break;
-				case SW:
-					dataMem[operador_0] = operador_1; //se hace el store en memoria
-					MEM_WB[0] = operador_0;			//no hace nada pero tiene que pasar el valor
-					MEM_WB[1] = operador_1;			//no hace nada pero tiene que pasar el valor
-					MEM_WB[2] = operador_2; 			//codigo de operacion
+				switch(operador_2){
+				case LW:
+					/*codigo viejo, sin implementacion de cache
+						MEM_WB[0] = dataMem[EX_MEM[0]]; //
+						MEM_WB[1] = EX_MEM[1];			//
+						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion */
+
+					//primero hay que verificar que la direccion que se tratará de leer sea valida
+					direccionValida = verificarDirMem(operador_0);
+					if(direccionValida){//si diera false, sería bueno agregar un manejo de excepcion
+						//si fuera válida, hay que verificar que haya un hit de memoria en cache.
+						//si diera fallo, hay que traer el bloque desde memoria, si estuviera se toma directo de la cache
+						bloqueMem = calcularBloqueMemoria(operador_0);
+						bloqueCache = calcularBloqueCache(operador_0);
+						if(!hitMemoria(operador_0)){
+							//si hubiera fallo de memoria y el bloque en cache correspondiente está modificado,
+							//primero hay que guardarlo a memoria. para esto primero calculamos el bloque en memoria
+							//del dato que se quiere cargar. es aqui cuando se usa la estrategia WRITE ALLOCATE
+							if(cache[bloqueCache].getEstado() == 'm'){
+								cacheStore(bloqueCache);
+							}
+							//en este punto se hace se carga la cache, pues no hubo hit de memoria
+							//y si el bloque estaba modificado ya se guardó antes a memoria
+							//es aqui cuando se usa la estrategia de WRITE BACK
+							cacheLoad(operador_0);
+						}
+						//en este punto sí hubo hit de memoria, por lo que se carga el dato desde la cache
+						int indice = ((operador_0+768) / 16 ) % 4;
+						MEM_WB[0] = cache[bloqueCache].getValor(indice);
+						//System.out.println(MEM_WB[0]);
+						MEM_WB[1] = operador_1;			//
+						MEM_WB[2] = operador_2; 			//en MEM_WB[2] va el codigo de operacion			
+					}//fin de if direccionValida
 					break;
 
-					// aqui se maneja el caso de que sea otra operacion
-					// resuelta en EX o sea codigo de operacion FIN
+				case SW:
+					/*codigo viejo, sin implementacion de cache
+						dataMem[EX_MEM[0]] = EX_MEM[1]; //se hace el store en memoria
+						MEM_WB[0] = EX_MEM[0];			//no hace nada pero tiene que pasar el valor
+						MEM_WB[1] = EX_MEM[1];			//no hace nada pero tiene que pasar el valor
+						MEM_WB[2] = EX_MEM[2]; 			//codigo de operacion*/
+
+					//nuevamente, lo primero es verificar que la referencia a memoria sea valida
+					direccionValida = verificarDirMem(operador_0);
+					if(direccionValida){
+						//si fuera valida, se verifica si el bloque de memoria está en cache
+						bloqueMem = calcularBloqueMemoria(operador_0);
+						bloqueCache = calcularBloqueCache(operador_0);
+						if(!hitMemoria(operador_0)){
+							//si no hay hit de memoria hay que cargar el bloque a cache, pero si en el bloque de cache
+							//donde vamos a escribir está modificado, primero hay que escribir el bloque actual a memoria:
+							if(cache[bloqueCache].getEstado() == 'm'){
+								cacheStore(bloqueCache);
+							}
+							//si no estuviera modificado, entonces ya podemos escribir el bloque de cache a memoria
+							cacheLoad(operador_0);
+						}
+						//con el bloque ya en cache, debemos escribir en la posicion correcta del bloque
+						int offset = (operador_0 / 4) % 4; //se calcula el desplazamiento en el bloque
+						cache[bloqueCache].setBloquePos(offset, operador_1); //el valor a guardar esta en EX_MEM[1]
+						cache[bloqueCache].setEstado('m'); //cuando se escribe en cache el estado debe pasar a modificado
+						cacheStore(bloqueCache);
+						//pasa los valores a MEM_WB
+						MEM_WB[0] = operador_0;			//no hace nada pero tiene que pasar el valor
+						MEM_WB[1] = operador_1;			//no hace nada pero tiene que pasar el valor
+						MEM_WB[2] = operador_2; 			//en MEM_WB[2] va el codigo de operacion
+					}
+					break;
+
+				case LL://hace exactamente lo mismo que un load normal, pero ademas de eso escribe el link register
+					direccionValida = verificarDirMem(operador_0);
+					if(direccionValida){//si diera false, sería bueno agregar un manejo de excepcion
+						//si fuera válida, hay que verificar que haya un hit de memoria en cache.
+						//si diera fallo, hay que traer el bloque desde memoria, si estuviera se toma directo de la cache
+						bloqueMem = calcularBloqueMemoria(operador_0);
+						bloqueCache = calcularBloqueCache(operador_0);
+						if(!hitMemoria(operador_0)){
+							//si hubiera fallo de memoria y el bloque en cache correspondiente está modificado,
+							//primero hay que guardarlo a memoria. para esto primero calculamos el bloque en memoria
+							//del dato que se quiere cargar. es aqui cuando se usa la estrategia WRITE ALLOCATE
+							if(cache[bloqueCache].getEtiqueta() == bloqueMem && cache[bloqueCache].getEtiqueta() == 'm'){
+								cacheStore(bloqueCache);
+							}
+							//en este punto se hace se carga la cache, pues no hubo hit de memoria
+							//y si el bloque estaba modificado ya se guardó antes a memoria
+							//es aqui cuando se usa la estrategia de WRITE BACK
+							cacheLoad(operador_0);
+						}
+						//en este punto sí hubo hit de memoria, por lo que se carga el dato desde la cache
+						int indice = ((operador_0+768) / 16 ) % 4;
+						MEM_WB[0] = cache[bloqueCache].getValor(indice);
+						//System.out.println(MEM_WB[0]);
+						MEM_WB[1] = operador_1;			//
+						MEM_WB[2] = operador_2; 			//en MEM_WB[2] va el codigo de operacion			
+					}//fin de if direccionValida
+				break;
+				case SC://igual a SW, solo que se hace solo si el register link es igual a la direccion de la memoria y pone 1 en Rx
+						//si no fueran iguales, entonces no pasa nada en memoria y pone un 0 en Rx
+					if(true){
+						direccionValida = verificarDirMem(operador_0);
+						if(direccionValida){
+							//si fuera valida, se verifica si el bloque de memoria está en cache
+							bloqueMem = calcularBloqueMemoria(operador_0);
+							bloqueCache = calcularBloqueCache(operador_0);
+							if(!hitMemoria(operador_0)){
+								//si no hay hit de memoria hay que cargar el bloque a cache, pero si en el bloque de cache
+								//donde vamos a escribir está modificado, primero hay que escribir el bloque actual a memoria:
+								if(cache[bloqueCache].getEtiqueta() == bloqueMem && cache[bloqueCache].getEtiqueta() == 'm'){
+									cacheStore(bloqueCache);
+								}
+								//si no estuviera modificado, entonces ya podemos escribir el bloque de cache a memoria
+								cacheLoad(operador_0);
+							}
+							//con el bloque ya en cache, debemos escribir en la posicion correcta del bloque
+							int offset = (operador_0 / 4) % 4; //se calcula el desplazamiento en el bloque
+							cache[bloqueCache].setBloquePos(offset, operador_1); //el valor a guardar esta en EX_MEM[1]
+							cache[bloqueCache].setEstado('m'); //cuando se escribe en cache el estado debe pasar a modificado
+
+							//pasa los valores a MEM_WB
+							MEM_WB[0] = operador_0;			//no hace nada pero tiene que pasar el valor
+							MEM_WB[1] = operador_1;			//no hace nada pero tiene que pasar el valor
+							MEM_WB[2] = operador_2; 			//en MEM_WB[2] va el codigo de operacion
+						}
+					}
+					else{
+						
+					}
+				break;
 				default:
 					MEM_WB[0] = operador_0;
 					MEM_WB[1] = operador_1;
-					MEM_WB[2] = operador_2; 			//codigo de operacion
+					MEM_WB[2] = operador_2; 			//en MEM_WB va el codigo de operacion
+				
 				}//fin del switch
 
 				semMem.release();
-				semEx.release();
+				
 
 				//*****PRUEBA
 				System.out.println("ENTRO MEM_WB: " + MEM_WB[2] +
@@ -877,6 +1026,9 @@ public class MIPSimulator {
 				operador_0 = MEM_WB[0]; 
 				operador_1 = MEM_WB[1]; 
 				operador_2 = MEM_WB[2]; 
+				
+				// Le dice a la etapa MEM que ya esta libre 
+				semMem.release(1);
 
 				/* Cuando recibe un 63 de código de operacion no hace nada  solo actualiza el ciclo 
 				 * del reloj y avisa a las etapas que murio mediante la bandera wbAlive */
@@ -960,8 +1112,7 @@ public class MIPSimulator {
 					System.out.println();
 				}
 
-				// Le dice a la etapa MEM que ya esta libre y libera registros
-				semMem.release(1);
+				// Libera los registros para ID los pueda usar
 				semR.release();
 
 				/* Con este barrier que el hilo principal controla se actualiza el ciclo del reloj
