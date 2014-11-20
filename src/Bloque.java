@@ -11,7 +11,7 @@ public class Bloque {
 	//constructor de la clase Bloque
 	public Bloque(){
 		etiqueta =-1; //como aun no contiene ningun bloque de memoria, se inicializa en -1
-		estado = 'c'; //por defecto el estado del bloque es valido
+		estado = 'v'; //por defecto el estado del bloque es 'v' de vacio porque aun no se le carga un bloque de memoria
 		bloque = new int[tamBloque];
 		//inicializa el bloque con ceros
 		for(int i=0; i<tamBloque; ++i){
@@ -27,11 +27,6 @@ public class Bloque {
 	public void setEstado(char status){
 		estado = status;
 	}
-	
-	
-	//public int[] getBloque(){
-	//	return bloque;
-	//}
 	
 	public int getValor(int indice){
 		return bloque[indice];
