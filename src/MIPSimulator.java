@@ -1330,6 +1330,14 @@ public class MIPSimulator {
 		if((dir>767 && dir<4093) && (dir % 4 == 0 )){
 			valida = true;
 		}
+		else{
+			if(dir>767 && dir<4093){
+				System.err.println("La dirección " + dir + " se sale del rango válido.");
+			}
+			else{
+				System.err.println("La dirección " + dir + " no cumple con ser múltiplo de 4.");
+			}
+		}
 		return valida;
 	}
 
