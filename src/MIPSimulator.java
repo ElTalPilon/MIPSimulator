@@ -28,8 +28,8 @@ public class MIPSimulator {
 	private final int DDIV 	= 14;
 	private final int LW 	= 35;
 	private final int SW 	= 43;
-	private final int BEQZ	= 4;
-	private final int BNEZ	= 5;
+	private final int BEQZ	= 4;	//se resuelve en IDstage
+	private final int BNEZ	= 5;	//se resuelve en IDstage
 	private final int LL 	= 50;
 	private final int SC	= 51;
 	private final int FIN 	= 63;
@@ -1514,7 +1514,16 @@ public class MIPSimulator {
 			ID_EX[2] = IF_ID[2];			// Reg Destino
 			ID_EX[3] = IF_ID[0];			// operation code
 			break;
-
+		case BEQZ:
+			if(R[IF_ID[1]] == 0){
+				PC = IF_ID[4];
+			}
+		break;
+		case BNEZ:
+			if(R[IF_ID[1]] != 0){
+				PC = IF_ID[4];
+			}
+		break;
 		}//fin del switch
 
 		//System.out.println("ENTRO: ID_EX: " + ID_EX[0] + ID_EX[1] + ID_EX[2] + ID_EX[3]);
@@ -1525,28 +1534,28 @@ public class MIPSimulator {
 		switch(ID_EX[3]){
 		case DADDI:
 			EX_MEM[0] = ID_EX[0]+ID_EX[2];
-			EX_MEM[1] = ID_EX[1]; //como escribe en registro, el campo de memoria va vacio
-			EX_MEM[2] = ID_EX[3]; //codigo de operacion
+			EX_MEM[1] = ID_EX[1]; 			//como escribe en registro, el campo de memoria va vacio
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
 		case DADD:
 			EX_MEM[0] = ID_EX[0] + ID_EX[1];
 			EX_MEM[1] = ID_EX[2];
-			EX_MEM[2] = ID_EX[3]; //codigo de operacion
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
 		case DSUB:
 			EX_MEM[0] = ID_EX[0] - ID_EX[1];
 			EX_MEM[1] = ID_EX[2];
-			EX_MEM[2] = ID_EX[3]; //codigo de operacion
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
 		case DMUL:
 			EX_MEM[0] = ID_EX[0] * ID_EX[1];
 			EX_MEM[1] = ID_EX[2];
-			EX_MEM[2] = ID_EX[3]; //codigo de operacion
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
 		case DDIV:
 			EX_MEM[0] = ID_EX[0] / ID_EX[1];
 			EX_MEM[1] = ID_EX[2];
-			EX_MEM[2] = ID_EX[3]; //codigo de operacion
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
 		case LW:
 			EX_MEM[0] = ID_EX[0]+ID_EX[1];	//Resultado de memoria del ALU
@@ -1568,6 +1577,12 @@ public class MIPSimulator {
 			EX_MEM[1] = ID_EX[2];			//Registro Destino
 			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 			break;
+		case BEQZ://no hace nada, solo pasa el opCode
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
+		break;
+		case BNEZ://no hace nada, solo pasa el opCode
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
+		break;
 		}//fin del switch
 	}//fin metodo execute
 
