@@ -32,6 +32,8 @@ public class MIPSimulator {
 	private final int BNEZ	= 5;	//se resuelve en IDstage
 	private final int LL 	= 50;
 	private final int SC	= 51;
+	private final int JAL	= 2;
+	private final int JR	= 3;
 	private final int FIN 	= 63;
 	
 	private int linkRegister;
@@ -1514,15 +1516,27 @@ public class MIPSimulator {
 			ID_EX[2] = IF_ID[2];			// Reg Destino
 			ID_EX[3] = IF_ID[0];			// operation code
 			break;
-		case BEQZ:
+		case BEQZ://se resuelve en ID
 			if(R[IF_ID[1]] == 0){
 				PC = IF_ID[4];
 			}
+			ID_EX[3] = IF_ID[0];			// operation code
 		break;
-		case BNEZ:
+		case BNEZ://se resuelve en ID
 			if(R[IF_ID[1]] != 0){
 				PC = IF_ID[4];
 			}
+			ID_EX[3] = IF_ID[0];			// operation code
+		break;
+		case JAL:
+			//R[31] = PC+16;				// guarda la direccion de la siguiente instruccion
+			ID_EX[2] = PC;					//pasa el PC actual, se guardará en R[31]
+			PC= PC+IF_ID[1];				
+			ID_EX[3] = IF_ID[0];			// operation code
+		break;
+		case JR://JR tambien se resuelve en ID
+			PC = R[IF_ID[0]];
+			ID_EX[3] = IF_ID[0];			// operation code
 		break;
 		}//fin del switch
 
@@ -1580,9 +1594,11 @@ public class MIPSimulator {
 		case BEQZ://no hace nada, solo pasa el opCode
 			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 		break;
-		case BNEZ://no hace nada, solo pasa el opCode
-			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
+		case JAL:
+			EX_MEM[1] = ID_EX[2] + 16;		//PC que se guardará en R[31]
 		break;
+		default://no hace nada, solo pasa el opCode
+			EX_MEM[2] = ID_EX[3]; 			//codigo de operacion
 		}//fin del switch
 	}//fin metodo execute
 
@@ -1755,6 +1771,9 @@ public class MIPSimulator {
 			if(MEM_WB[2] == 0){			//si el SC no tuvo exito
 				R[MEM_WB[1]] = 0;
 			}
+		break;
+		case JAL:
+			R[31] = MEM_WB[1];			//guarda el PC en R[31]
 		break;
 			//en RW no hace nada en la etapa de writeback
 		}//fin del switch
