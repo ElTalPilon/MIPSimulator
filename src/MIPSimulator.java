@@ -1331,7 +1331,7 @@ public class MIPSimulator {
 			valida = true;
 		}
 		else{
-			if(dir>767 && dir<4093){
+			if(dir<=767 || dir>=4093){
 				System.err.println("La dirección " + dir + " se sale del rango válido.");
 			}
 			else{
